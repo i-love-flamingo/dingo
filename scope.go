@@ -32,7 +32,7 @@ var (
 	// Singleton is the default SingletonScope for dingo
 	Singleton Scope = NewSingletonScope()
 
-	// ChildSingleton is a per-child singleton
+	// ChildSingleton is a per-child singleton, means singletons are scoped and local to an injector instance
 	ChildSingleton Scope = NewChildSingletonScope()
 )
 

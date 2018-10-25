@@ -15,8 +15,8 @@ The following example shows a BillingService with two injected dependencies. Ple
 that Go's nature does not allow contructors, and does not allow decorations/annotations
 beside struct-tags, thus, we only use struct tags (and later arguments for providers).
 
-Also Go does not have a way to reference types (like Java's `Something.class`) we use `nil`
-and cast it to a pointer to the interface we want to specify: `(*Something)(nil)`.
+Also Go does not have a way to reference types (like Java's `Something.class`) we use either pointers
+or `nil` and cast it to a pointer to the interface we want to specify: `(*Something)(nil)`.
 Dingo then knowns how to dereference it properly and derive the correct type `Something`.
 This is not necessary for structs, where we can just use the null value via `Something{}`.
 
@@ -431,8 +431,8 @@ Interception should be used with care!
 
 ```go
 func (m *Module) Configure(injector *dingo.Injector) {
-	injector.BindInterceptor((*template.Engine)(nil), TplInterceptor{})
-	injector.BindInterceptor((*template.Function)(nil), FunctionInterceptor{})
+	injector.BindInterceptor(new(template.Engine), TplInterceptor{})
+	injector.BindInterceptor(new(template.Function), FunctionInterceptor{})
 }
 
 type (
@@ -480,7 +480,12 @@ func main() {
    * Now that we've got the injector, we can build objects.
    * We get a new instance, and cast it accordingly:
    */
-  var billingService = injector.GetInstance((*BillingService)(nil)).(BillingService)
+  var billingService = injector.GetInstance(new(BillingService)).(BillingService)
   //...
 }
 ```
+
+## Dingo vs. Wire
+
+Recently https://github.com/google/go-cloud/tree/master/wire popped out in the go ecosystem, which seems to be a great choice, also because it supports compile time dependency injection.
+However, when Dingo was first introduced wire was not a thing, and wire still lacks features dingo provides. 
