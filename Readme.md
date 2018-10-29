@@ -2,7 +2,6 @@
 
 Dependency injection for go
 
-
 ## Hello Dingo
 
 Dingo works very very similiar to [Guice](github.com/google/guice/wiki/GettingStarted)
@@ -179,6 +178,9 @@ In your modul you can provide default configuraton values by implementing the Me
 
 Example:
 ```go
+package example
+
+type Module struct{}
 
 // DefaultConfig for this module
 func (m *Module) DefaultConfig() config.Map {
@@ -460,15 +462,13 @@ func (f *FunctionInterceptor) Name() string {
 }
 ```
 
-
-
 ## Initializing Dingo
 At the topmost level the injector is created and used in the following way:
 
 ```go
 package main
 
-import "go.aoe.com/flamingo/framework/dingo"
+import "flamingo.me/dingo"
 
 func main() {
   var injector = dingo.NewInjector()
