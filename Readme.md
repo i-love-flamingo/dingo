@@ -173,27 +173,6 @@ This means that for interfaces, slices, pointers etc where dingo can not resolve
 
 You can check via `if my.Prop == nil` if this is nil.
 
-## Providing Default Configurations
-In your modul you can provide default configuraton values by implementing the Method "DefaultConfig".
-
-Example:
-```go
-package example
-
-type Module struct{}
-
-// DefaultConfig for this module
-func (m *Module) DefaultConfig() config.Map {
-	return config.Map{
-		"session.backend":                "memory",
-		"session.secret":                 "flamingosecret",
-		...
-	}
-}
-
-```
-
-
 ## Bindings
 
 Dingo uses bindings to express dependencies resolutions, and will panic if there is more than one
@@ -284,7 +263,7 @@ If really necessary it is possible to use singletons
 ``` 
 .AsEagerSingleton() binds as a singleton, and loads it when the application is initialized
 .In(dingo.Singleton) makes it a global singleton
-.In(dingo.ChildSingleton) makes it a singleton limited to the config area
+.In(dingo.ChildSingleton) makes it a singleton limited to the current injector
 ```
 
 `In` allows us to bind in a scope, making the created instances scoped in a certain way.
