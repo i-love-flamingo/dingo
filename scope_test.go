@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -18,6 +19,8 @@ func testScope(t *testing.T, scope Scope) {
 
 	unscoped := func(t reflect.Type, annotation string, optional bool) reflect.Value {
 		atomic.AddInt64(&requestedUnscoped, 1)
+
+		time.Sleep(1 * time.Nanosecond)
 
 		if optional {
 			return reflect.Value{}

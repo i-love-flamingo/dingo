@@ -19,9 +19,9 @@ type (
 	// SingletonScope is our Scope to handle Singletons
 	// todo use RWMutex for proper locking
 	SingletonScope struct {
-		sync.Mutex                                // lock guarding instaceLocks
+		mu           sync.Mutex                   // lock guarding instaceLocks
 		instanceLock map[identifier]*sync.RWMutex // lock guarding instances
-		instances    map[identifier]reflect.Value
+		instances    sync.Map
 	}
 
 	// ChildSingletonScope manages child-specific singleton
@@ -38,12 +38,12 @@ var (
 
 // NewSingletonScope creates a new singleton scope
 func NewSingletonScope() *SingletonScope {
-	return &SingletonScope{instanceLock: make(map[identifier]*sync.RWMutex), instances: make(map[identifier]reflect.Value)}
+	return &SingletonScope{instanceLock: make(map[identifier]*sync.RWMutex)}
 }
 
 // NewChildSingletonScope creates a new child singleton scope
 func NewChildSingletonScope() *ChildSingletonScope {
-	return &ChildSingletonScope{instanceLock: make(map[identifier]*sync.RWMutex), instances: make(map[identifier]reflect.Value)}
+	return &ChildSingletonScope{instanceLock: make(map[identifier]*sync.RWMutex)}
 }
 
 // ResolveType resolves a request in this scope
@@ -51,25 +51,29 @@ func (s *SingletonScope) ResolveType(t reflect.Type, annotation string, unscoped
 	ident := identifier{t, annotation}
 
 	// try to get the instance type lock
-	s.Lock()
+	s.mu.Lock()
 
 	if l, ok := s.instanceLock[ident]; ok {
 		// we have the instance lock
-		s.Unlock()
+		s.mu.Unlock()
 		l.RLock()
 		defer l.RUnlock()
-		return s.instances[ident]
+
+		instance, _ := s.instances.Load(ident)
+		return instance.(reflect.Value)
 	}
 
 	s.instanceLock[ident] = new(sync.RWMutex)
-	s.instanceLock[ident].Lock()
-	s.Unlock()
+	l := s.instanceLock[ident]
+	l.Lock()
+	s.mu.Unlock()
 
-	s.instances[ident] = unscoped(t, annotation, false)
+	instance := unscoped(t, annotation, false)
+	s.instances.Store(ident, instance)
 
-	defer s.instanceLock[ident].Unlock()
+	defer l.Unlock()
 
-	return s.instances[ident]
+	return instance
 }
 
 // ResolveType delegates to SingletonScope.ResolveType
