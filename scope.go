@@ -67,7 +67,7 @@ func (s *SingletonScope) ResolveType(t reflect.Type, annotation string, unscoped
 
 	s.instances[ident] = unscoped(t, annotation, false)
 
-	s.instanceLock[ident].Unlock()
+	defer s.instanceLock[ident].Unlock()
 
 	return s.instances[ident]
 }
