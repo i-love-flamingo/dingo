@@ -155,7 +155,7 @@ func (injector *Injector) InitModules(modules ...Module) {
 				if binding.to != nil {
 					duplicateBinding = fmt.Sprintf("%#v%#v", binding.to.PkgPath(), binding.to.Name())
 				}
-				panic(fmt.Sprintf("already known binding for %s with annotation '%s' | Known binding: %s Try %s", typ, binding.annotatedWith, knownBinding, duplicateBinding))
+				panic(fmt.Sprintf("already known binding for %s with annotation '%s' | Known binding: %q Try %q", typ, binding.annotatedWith, knownBinding, duplicateBinding))
 			}
 			known[binding.annotatedWith] = binding
 		}
