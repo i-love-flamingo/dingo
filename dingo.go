@@ -103,7 +103,7 @@ func (injector *Injector) Child() *Injector {
 }
 
 // InitModules initializes the injector with the given modules
-func (injector *Injector) InitModules(modules ...Module) {
+func (injector *Injector) InitModules(modules ...Module) []Module {
 	injector.stage = INIT
 
 	// todo better dependency resolution
@@ -180,6 +180,8 @@ func (injector *Injector) InitModules(modules ...Module) {
 			}
 		}
 	}
+
+	return modules
 }
 
 // GetInstance creates a new instance of what was requested
