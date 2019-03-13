@@ -19,6 +19,8 @@ or `nil` and cast it to a pointer to the interface we want to specify: `(*Someth
 Dingo then knowns how to dereference it properly and derive the correct type `Something`.
 This is not necessary for structs, where we can just use the null value via `Something{}`.
 
+See the example folder for a complete example.
+
 ```go
 package example
 
