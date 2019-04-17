@@ -318,7 +318,10 @@ func (injector *Injector) internalResolveType(t reflect.Type, annotation string,
 
 	// This for an injection request on a provider, such as `func() MyInstance`
 	if t.Kind() == reflect.Func && t.NumOut() == 1 && strings.HasSuffix(t.Name(), "Provider") {
-		return injector.createProvider(t, annotation, optional, circularTrace)
+		if traceCircular != nil {
+			return injector.createProvider(t, annotation, optional, make([]circularTraceEntry, 0))
+		}
+		return injector.createProvider(t, annotation, optional, nil)
 	}
 
 	// This is the injection request for multibindings
