@@ -106,24 +106,10 @@ func (injector *Injector) Child() *Injector {
 func (injector *Injector) InitModules(modules ...Module) {
 	injector.stage = INIT
 
-	// todo better dependency resolution
-	newModules := make([]Module, 0, len(modules))
+	modules = resolveDependencies(modules, nil)
 	for _, module := range modules {
-		if d, ok := module.(Depender); ok {
-			newModules = append(newModules, d.Depends()...)
-		}
-		newModules = append(newModules, module)
-	}
-	modules = newModules
-
-	known := make(map[reflect.Type]struct{}, len(modules))
-	for _, module := range modules {
-		if _, ok := known[reflect.TypeOf(module)]; ok {
-			continue
-		}
 		injector.requestInjection(module, traceCircular)
 		module.Configure(injector)
-		known[reflect.TypeOf(module)] = struct{}{}
 	}
 
 	// evaluate overrides when modules were loaded

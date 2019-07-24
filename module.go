@@ -3,6 +3,7 @@ package dingo
 import (
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 type (
@@ -33,4 +34,27 @@ func TryModule(modules ...Module) (resultingError error) {
 	injector.buildEagerSingletons = false
 	injector.InitModules(modules...)
 	return nil
+}
+
+// resolveDependencies tries to get a complete list of all modules, including all dependencies
+// known can be empty initially, and will then be used for subsequent recursive calls
+func resolveDependencies(modules []Module, known map[reflect.Type]struct{}) []Module {
+	final := make([]Module, 0, len(modules))
+
+	if known == nil {
+		known = make(map[reflect.Type]struct{})
+	}
+
+	for _, module := range modules {
+		if _, ok := known[reflect.TypeOf(module)]; ok {
+			continue
+		}
+		known[reflect.TypeOf(module)] = struct{}{}
+		if depender, ok := module.(Depender); ok {
+			final = append(final, resolveDependencies(depender.Depends(), known)...)
+		}
+		final = append(final, module)
+	}
+
+	return final
 }
