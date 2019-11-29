@@ -4,7 +4,7 @@ Dependency injection for go
 
 ## Hello Dingo
 
-Dingo works very very similiar to [Guice](github.com/google/guice/wiki/GettingStarted)
+Dingo works very very similiar to [Guice](https://github.com/google/guice/wiki/GettingStarted)
 
 Basically one binds implementations/factories to interfaces, which are then resolved by Dingo.
 
