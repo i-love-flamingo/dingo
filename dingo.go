@@ -1,11 +1,8 @@
 package dingo
 
 import (
-	"bytes"
-	"flag"
 	"fmt"
 	"log"
-	"os"
 	"reflect"
 	"strings"
 )
@@ -23,19 +20,6 @@ var traceCircular []circularTraceEntry
 // this is super expensive (memory wise), so it should only be used for debugging purposes
 func EnableCircularTracing() {
 	traceCircular = make([]circularTraceEntry, 0)
-}
-
-func init() {
-	fs := flag.NewFlagSet("", flag.ContinueOnError)
-	fs.SetOutput(new(bytes.Buffer))
-	enable := fs.Bool("dingo-trace-circular", false, "enable dingo circular tracing")
-	if err := fs.Parse(os.Args[1:]); err == flag.ErrHelp {
-		fs.SetOutput(os.Stderr)
-		fs.PrintDefaults()
-	}
-	if *enable {
-		EnableCircularTracing()
-	}
 }
 
 type (
