@@ -22,16 +22,18 @@ type (
 		i int
 	}
 
-	IfaceProvider func() Interface
+	IfaceProvider          func() Interface
+	IfaceWithErrorProvider func() (Interface, error)
 
 	DepTest struct {
 		Iface  Interface `inject:""`
 		Iface2 Interface `inject:"test"`
 
-		IfaceProvider      IfaceProvider `inject:""`
-		IfaceProvided      Interface     `inject:"provider"`
-		IfaceImpl1Provided Interface     `inject:"providerimpl1"`
-		IfaceInstance      Interface     `inject:"instance"`
+		IfaceProvider          IfaceProvider          `inject:""`
+		IfaceWithErrorProvider IfaceWithErrorProvider `inject:""`
+		IfaceProvided          Interface              `inject:"provider"`
+		IfaceImpl1Provided     Interface              `inject:"providerimpl1"`
+		IfaceInstance          Interface              `inject:"instance"`
 	}
 
 	TestSingleton struct {
@@ -77,20 +79,25 @@ func (if2 *InterfaceImpl2) Test() int {
 
 func TestDingoResolving(t *testing.T) {
 	t.Run("Should resolve dependencies on request", func(t *testing.T) {
-		injector := NewInjector(new(PreTestModule), new(TestModule))
+		injector, err := NewInjector(new(PreTestModule), new(TestModule))
+		assert.NoError(t, err)
 
+		i, err := injector.GetInstance(new(Interface))
+		assert.NoError(t, err)
 		var iface Interface
-		iface = injector.GetInstance(new(Interface)).(Interface)
+		iface = i.(Interface)
 
 		assert.Equal(t, 1, iface.Test())
 
-		dt := *injector.GetInstance(new(DepTest)).(*DepTest)
+		i, err = injector.GetInstance(new(DepTest))
+		assert.NoError(t, err)
+		dt := *i.(*DepTest)
 
 		assert.Equal(t, 1, dt.Iface.Test())
 		assert.Equal(t, 2, dt.Iface2.Test())
 
 		var dt2 DepTest
-		injector.requestInjection(&dt2, nil)
+		assert.NoError(t, injector.requestInjection(&dt2, nil))
 
 		assert.Equal(t, 1, dt2.Iface.Test())
 		assert.Equal(t, 2, dt2.Iface2.Test())
@@ -100,15 +107,45 @@ func TestDingoResolving(t *testing.T) {
 		assert.Equal(t, 2, dt.IfaceInstance.Test())
 
 		assert.Equal(t, 1, dt.IfaceProvider().Test())
+		iface, err = dt.IfaceWithErrorProvider()
+		assert.NoError(t, err)
+		assert.Equal(t, 1, iface.Test())
 		assert.Equal(t, "Hello World", dt.IfaceProvided.(*InterfaceImpl1).foo)
 		assert.Equal(t, "Hello World", dt.IfaceImpl1Provided.(*InterfaceImpl1).foo)
 	})
 
 	t.Run("Should resolve scopes", func(t *testing.T) {
-		injector := NewInjector(new(TestModule))
+		injector, err := NewInjector(new(TestModule))
+		assert.NoError(t, err)
 
-		assert.Equal(t, injector.GetInstance(TestSingleton{}), injector.GetInstance(TestSingleton{}))
+		i1, err := injector.GetInstance(TestSingleton{})
+		assert.NoError(t, err)
+		i2, err := injector.GetInstance(TestSingleton{})
+		assert.NoError(t, err)
+		assert.Equal(t, i1, i2)
 	})
+
+	t.Run("Error cases", func(t *testing.T) {
+		var injector *Injector
+		_, err := injector.Child()
+		assert.Error(t, err)
+	})
+}
+
+type testBoundNothingProvider func() *InterfaceImpl1
+
+func TestBoundToNothing(t *testing.T) {
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+
+	injector.Bind(new(InterfaceImpl1)).AnnotatedWith("test")
+
+	i, err := injector.GetInstance(new(testBoundNothingProvider))
+	assert.NoError(t, err)
+	ii, ok := i.(testBoundNothingProvider)
+	assert.True(t, ok)
+	assert.NotNil(t, ii)
+	assert.NotNil(t, ii())
 }
 
 // interceptors
@@ -154,10 +191,11 @@ func (a *AopInterceptor2) Test() string {
 }
 
 func TestInterceptors(t *testing.T) {
-	injector := NewInjector(new(AopModule))
+	injector, err := NewInjector(new(AopModule))
+	assert.NoError(t, err)
 
 	var dep AopDep
-	injector.requestInjection(&dep, nil)
+	assert.NoError(t, injector.requestInjection(&dep, nil))
 
 	assert.Equal(t, "Test 1 2", dep.A.Test())
 }
@@ -169,21 +207,23 @@ func TestOptional(t *testing.T) {
 		Optional2 string `inject:"option, optional"`
 	}
 
-	injector := NewInjector()
+	injector, err := NewInjector()
+	assert.NoError(t, err)
 
-	assert.Panics(t, func() {
-		_ = injector.GetInstance(new(test)).(*test)
-	}, "should panic because `must` is unbound")
+	_, err = injector.GetInstance(new(test))
+	assert.Error(t, err)
 
 	injector.Bind(new(string)).AnnotatedWith("must").ToInstance("must")
-	i := injector.GetInstance(new(test)).(*test)
-	assert.Equal(t, i.Must, "must")
-	assert.Equal(t, i.Optional, "")
-	assert.Equal(t, i.Optional2, "")
+	i, err := injector.GetInstance(new(test))
+	assert.NoError(t, err)
+	assert.Equal(t, i.(*test).Must, "must")
+	assert.Equal(t, i.(*test).Optional, "")
+	assert.Equal(t, i.(*test).Optional2, "")
 
 	injector.Bind(new(string)).AnnotatedWith("option").ToInstance("option")
-	i = injector.GetInstance(new(test)).(*test)
-	assert.Equal(t, i.Must, "must")
-	assert.Equal(t, i.Optional, "option")
-	assert.Equal(t, i.Optional2, "option")
+	i, err = injector.GetInstance(new(test))
+	assert.NoError(t, err)
+	assert.Equal(t, i.(*test).Must, "must")
+	assert.Equal(t, i.(*test).Optional, "option")
+	assert.Equal(t, i.(*test).Optional2, "option")
 }

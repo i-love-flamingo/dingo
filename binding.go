@@ -100,12 +100,14 @@ func (b *Binding) equal(to *Binding) bool {
 }
 
 // Create creates a new instance by the provider and requests injection, all provider arguments are automatically filled
-func (p *Provider) Create(injector *Injector) reflect.Value {
+func (p *Provider) Create(injector *Injector) (reflect.Value, error) {
 	in := make([]reflect.Value, p.fnc.Type().NumIn())
+	var err error
 	for i := 0; i < p.fnc.Type().NumIn(); i++ {
-		in[i] = injector.getInstance(p.fnc.Type().In(i), "", traceCircular)
+		if in[i], err = injector.getInstance(p.fnc.Type().In(i), "", traceCircular); err != nil {
+			return reflect.Value{}, err
+		}
 	}
 	res := p.fnc.Call(in)[0]
-	injector.requestInjection(res, traceCircular)
-	return res
+	return res, injector.requestInjection(res, traceCircular)
 }

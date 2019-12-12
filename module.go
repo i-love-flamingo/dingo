@@ -30,10 +30,12 @@ func TryModule(modules ...Module) (resultingError error) {
 		}
 	}()
 
-	injector := NewInjector()
+	injector, err := NewInjector()
+	if err != nil {
+		return err
+	}
 	injector.buildEagerSingletons = false
-	injector.InitModules(modules...)
-	return nil
+	return injector.InitModules(modules...)
 }
 
 // resolveDependencies tries to get a complete list of all modules, including all dependencies

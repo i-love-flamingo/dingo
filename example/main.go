@@ -30,16 +30,22 @@ func (*defaultModule) Configure(injector *dingo.Injector) {
 
 func main() {
 	// create a new injector and load modules
-	injector := dingo.NewInjector(
+	injector, err := dingo.NewInjector(
 		new(paypal.Module),
 		new(defaultModule),
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// instantiate the application service
-	service := injector.GetInstance(application.Service{}).(*application.Service)
+	service, err := injector.GetInstance(application.Service{})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// make a transaction
-	if err := service.MakeTransaction(99.95, "test transaction"); err != nil {
+	if err := service.(*application.Service).MakeTransaction(99.95, "test transaction"); err != nil {
 		log.Fatal(err)
 	}
 }

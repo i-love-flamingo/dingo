@@ -30,33 +30,39 @@ type (
 )
 
 func TestDingoCircula(t *testing.T) {
-	traceCircular = make([]circularTraceEntry, 0)
+	EnableCircularTracing()
 	defer func() {
 		traceCircular = nil
 	}()
 
-	injector := NewInjector()
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+
 	assert.Panics(t, func() {
-		_, ok := injector.GetInstance(new(circA)).(*circA)
+		i, err := injector.GetInstance(new(circA))
+		assert.NoError(t, err)
+		_, ok := i.(*circA)
 		if !ok {
 			t.Fail()
 		}
 	})
 
 	injector.Bind(new(circCInterface)).To(circC{})
-	assert.NotPanics(t, func() {
-		c, ok := injector.GetInstance(new(circC)).(*circC)
-		if !ok {
-			t.Fail()
-		}
 
-		assert.NotNil(t, c.C())
-	})
+	i, err := injector.GetInstance(new(circC))
+	assert.NoError(t, err)
+	c, ok := i.(*circC)
+	if !ok {
+		t.Fail()
+	}
+	assert.NotNil(t, c.C())
 
 	var d *circD
 	assert.NotPanics(t, func() {
 		var ok bool
-		d, ok = injector.GetInstance(new(circD)).(*circD)
+		i, err := injector.GetInstance(new(circD))
+		assert.NoError(t, err)
+		d, ok = i.(*circD)
 		if !ok {
 			t.Fail()
 		}

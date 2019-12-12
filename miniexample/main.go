@@ -23,13 +23,19 @@ func (*loggerModule) Configure(injector *dingo.Injector) {
 
 func main() {
 	// create a new injector
-	injector := dingo.NewInjector(
+	injector, err := dingo.NewInjector(
 		new(loggerModule),
 	)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// instantiate the log service
-	service := injector.GetInstance(logger.LogService{}).(*logger.LogService)
+	service, err := injector.GetInstance(logger.LogService{})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// do a sample log using our service
-	service.DoLog("here is an example log")
+	service.(*logger.LogService).DoLog("here is an example log")
 }

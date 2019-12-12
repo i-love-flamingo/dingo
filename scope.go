@@ -8,7 +8,7 @@ import (
 type (
 	// Scope defines a scope's behaviour
 	Scope interface {
-		ResolveType(t reflect.Type, annotation string, unscoped func(t reflect.Type, annotation string, optional bool) reflect.Value) reflect.Value
+		ResolveType(t reflect.Type, annotation string, unscoped func(t reflect.Type, annotation string, optional bool) (reflect.Value, error)) (reflect.Value, error)
 	}
 
 	identifier struct {
@@ -47,7 +47,7 @@ func NewChildSingletonScope() *ChildSingletonScope {
 }
 
 // ResolveType resolves a request in this scope
-func (s *SingletonScope) ResolveType(t reflect.Type, annotation string, unscoped func(t reflect.Type, annotation string, optional bool) reflect.Value) reflect.Value {
+func (s *SingletonScope) ResolveType(t reflect.Type, annotation string, unscoped func(t reflect.Type, annotation string, optional bool) (reflect.Value, error)) (reflect.Value, error) {
 	ident := identifier{t, annotation}
 
 	// try to get the instance type lock
@@ -60,7 +60,7 @@ func (s *SingletonScope) ResolveType(t reflect.Type, annotation string, unscoped
 		defer l.RUnlock()
 
 		instance, _ := s.instances.Load(ident)
-		return instance.(reflect.Value)
+		return instance.(reflect.Value), nil
 	}
 
 	s.instanceLock[ident] = new(sync.RWMutex)
@@ -68,15 +68,15 @@ func (s *SingletonScope) ResolveType(t reflect.Type, annotation string, unscoped
 	l.Lock()
 	s.mu.Unlock()
 
-	instance := unscoped(t, annotation, false)
+	instance, err := unscoped(t, annotation, false)
 	s.instances.Store(ident, instance)
 
 	defer l.Unlock()
 
-	return instance
+	return instance, err
 }
 
 // ResolveType delegates to SingletonScope.ResolveType
-func (c *ChildSingletonScope) ResolveType(t reflect.Type, annotation string, unscoped func(t reflect.Type, annotation string, optional bool) reflect.Value) reflect.Value {
+func (c *ChildSingletonScope) ResolveType(t reflect.Type, annotation string, unscoped func(t reflect.Type, annotation string, optional bool) (reflect.Value, error)) (reflect.Value, error) {
 	return (*SingletonScope)(c).ResolveType(t, annotation, unscoped)
 }
