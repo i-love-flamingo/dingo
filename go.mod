@@ -1,9 +1,9 @@
 module flamingo.me/dingo
 
-go 1.12
+go 1.13
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/testify v1.2.2
+	github.com/stretchr/testify v1.4.0
+	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
 )

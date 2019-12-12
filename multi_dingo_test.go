@@ -36,13 +36,16 @@ type (
 )
 
 func TestMultiBinding(t *testing.T) {
-	injector := NewInjector()
+	injector, err := NewInjector()
+	assert.NoError(t, err)
 
 	injector.BindMulti((*mapBindInterface)(nil)).ToInstance("testkey instance")
 	injector.BindMulti((*mapBindInterface)(nil)).ToInstance("testkey2 instance")
 	injector.BindMulti((*mapBindInterface)(nil)).ToInstance("testkey3 instance")
 
-	test := injector.GetInstance(&multiBindTest{}).(*multiBindTest)
+	i, err := injector.GetInstance(&multiBindTest{})
+	assert.NoError(t, err)
+	test := i.(*multiBindTest)
 	list := test.Mb
 
 	assert.Len(t, list, 3)
@@ -53,16 +56,20 @@ func TestMultiBinding(t *testing.T) {
 }
 
 func TestMultiBindingChild(t *testing.T) {
-	injector := NewInjector()
+	injector, err := NewInjector()
+	assert.NoError(t, err)
 
 	injector.BindMulti((*mapBindInterface)(nil)).ToInstance("testkey instance")
 	injector.BindMulti((*mapBindInterface)(nil)).ToInstance("testkey2 instance")
 	injector.BindMulti((*mapBindInterface)(nil)).ToInstance("testkey3 instance")
 
-	child := injector.Child()
+	child, err := injector.Child()
+	assert.NoError(t, err)
 	child.BindMulti((*mapBindInterface)(nil)).ToInstance("testkey4 instance")
 
-	test := injector.GetInstance(&multiBindTest{}).(*multiBindTest)
+	i, err := injector.GetInstance(&multiBindTest{})
+	assert.NoError(t, err)
+	test := i.(*multiBindTest)
 	list := test.Mb
 
 	assert.Len(t, list, 3)
@@ -71,7 +78,9 @@ func TestMultiBindingChild(t *testing.T) {
 	assert.Equal(t, "testkey2 instance", list[1])
 	assert.Equal(t, "testkey3 instance", list[2])
 
-	test = child.GetInstance(&multiBindTest{}).(*multiBindTest)
+	i, err = child.GetInstance(&multiBindTest{})
+	assert.NoError(t, err)
+	test = i.(*multiBindTest)
 	list = test.Mb
 
 	assert.Len(t, list, 4)
@@ -83,13 +92,16 @@ func TestMultiBindingChild(t *testing.T) {
 }
 
 func TestMultiBindingProvider(t *testing.T) {
-	injector := NewInjector()
+	injector, err := NewInjector()
+	assert.NoError(t, err)
 
 	injector.BindMulti((*mapBindInterface)(nil)).ToInstance("testkey instance")
 	injector.BindMulti((*mapBindInterface)(nil)).ToInstance("testkey2 instance")
 	injector.BindMulti((*mapBindInterface)(nil)).ToInstance("testkey3 instance")
 
-	test := injector.GetInstance(&multiBindProviderTest{}).(*multiBindProviderTest)
+	i, err := injector.GetInstance(&multiBindProviderTest{})
+	assert.NoError(t, err)
+	test := i.(*multiBindProviderTest)
 	list := test.Mbp()
 
 	assert.Len(t, list, 3)
@@ -100,13 +112,16 @@ func TestMultiBindingProvider(t *testing.T) {
 }
 
 func TestMultiBindingComplex(t *testing.T) {
-	injector := NewInjector()
+	injector, err := NewInjector()
+	assert.NoError(t, err)
 
 	injector.BindMulti((*mapBindInterface)(nil)).ToInstance("testkey instance")
 	injector.BindMulti((*mapBindInterface)(nil)).To("testkey2 instance")
 	injector.BindMulti((*mapBindInterface)(nil)).ToProvider(func() mapBindInterface { return "provided" })
 
-	test := injector.GetInstance(&multiBindTest{}).(*multiBindTest)
+	i, err := injector.GetInstance(&multiBindTest{})
+	assert.NoError(t, err)
+	test := i.(*multiBindTest)
 	list := test.Mb
 
 	assert.Len(t, list, 3)
@@ -117,13 +132,16 @@ func TestMultiBindingComplex(t *testing.T) {
 }
 
 func TestMultiBindingComplexProvider(t *testing.T) {
-	injector := NewInjector()
+	injector, err := NewInjector()
+	assert.NoError(t, err)
 
 	injector.BindMulti((*mapBindInterface)(nil)).ToInstance("testkey instance")
 	injector.BindMulti((*mapBindInterface)(nil)).To("testkey2 instance")
 	injector.BindMulti((*mapBindInterface)(nil)).ToProvider(func() mapBindInterface { return "provided" })
 
-	test := injector.GetInstance(&multiBindProviderTest{}).(*multiBindProviderTest)
+	i, err := injector.GetInstance(&multiBindProviderTest{})
+	assert.NoError(t, err)
+	test := i.(*multiBindProviderTest)
 	list := test.Mbp()
 
 	assert.Len(t, list, 3)
@@ -134,13 +152,16 @@ func TestMultiBindingComplexProvider(t *testing.T) {
 }
 
 func TestMapBinding(t *testing.T) {
-	injector := NewInjector()
+	injector, err := NewInjector()
+	assert.NoError(t, err)
 
 	injector.BindMap((*mapBindInterface)(nil), "testkey").ToInstance("testkey instance")
 	injector.BindMap((*mapBindInterface)(nil), "testkey2").ToInstance("testkey2 instance")
 	injector.BindMap((*mapBindInterface)(nil), "testkey3").ToInstance("testkey3 instance")
 
-	test1 := injector.GetInstance(&mapBindTest1{}).(*mapBindTest1)
+	i, err := injector.GetInstance(&mapBindTest1{})
+	assert.NoError(t, err)
+	test1 := i.(*mapBindTest1)
 	test1map := test1.Mbp()
 
 	assert.Len(t, test1map, 3)
@@ -148,21 +169,27 @@ func TestMapBinding(t *testing.T) {
 	assert.Equal(t, "testkey2 instance", test1map["testkey2"])
 	assert.Equal(t, "testkey3 instance", test1map["testkey3"])
 
-	test2 := injector.GetInstance(&mapBindTest2{}).(*mapBindTest2)
+	i, err = injector.GetInstance(&mapBindTest2{})
+	assert.NoError(t, err)
+	test2 := i.(*mapBindTest2)
 	assert.Equal(t, test2.Mb, "testkey instance")
 }
 
 func TestMapBindingChild(t *testing.T) {
-	injector := NewInjector()
+	injector, err := NewInjector()
+	assert.NoError(t, err)
 
 	injector.BindMap((*mapBindInterface)(nil), "testkey").ToInstance("testkey instance")
 	injector.BindMap((*mapBindInterface)(nil), "testkey2").ToInstance("testkey2 instance")
 	injector.BindMap((*mapBindInterface)(nil), "testkey3").ToInstance("testkey3 instance")
 
-	child := injector.Child()
+	child, err := injector.Child()
+	assert.NoError(t, err)
 	child.BindMap((*mapBindInterface)(nil), "testkey4").ToInstance("testkey4 instance")
 
-	test1 := injector.GetInstance(&mapBindTest1{}).(*mapBindTest1)
+	i, err := injector.GetInstance(&mapBindTest1{})
+	assert.NoError(t, err)
+	test1 := i.(*mapBindTest1)
 	test1map := test1.Mbp()
 
 	assert.Len(t, test1map, 3)
@@ -170,10 +197,14 @@ func TestMapBindingChild(t *testing.T) {
 	assert.Equal(t, "testkey2 instance", test1map["testkey2"])
 	assert.Equal(t, "testkey3 instance", test1map["testkey3"])
 
-	test2 := injector.GetInstance(&mapBindTest2{}).(*mapBindTest2)
+	i, err = injector.GetInstance(&mapBindTest2{})
+	assert.NoError(t, err)
+	test2 := i.(*mapBindTest2)
 	assert.Equal(t, test2.Mb, "testkey instance")
 
-	testChild := child.GetInstance(&mapBindTest1{}).(*mapBindTest1)
+	i, err = child.GetInstance(&mapBindTest1{})
+	assert.NoError(t, err)
+	testChild := i.(*mapBindTest1)
 	testChildmap := testChild.Mbp()
 
 	assert.Len(t, testChildmap, 4)
@@ -184,13 +215,16 @@ func TestMapBindingChild(t *testing.T) {
 }
 
 func TestMapBindingProvider(t *testing.T) {
-	injector := NewInjector()
+	injector, err := NewInjector()
+	assert.NoError(t, err)
 
 	injector.BindMap((*mapBindInterface)(nil), "testkey").ToInstance("testkey instance")
 	injector.BindMap((*mapBindInterface)(nil), "testkey2").ToInstance("testkey2 instance")
 	injector.BindMap((*mapBindInterface)(nil), "testkey3").ToInstance("testkey3 instance")
 
-	test := injector.GetInstance(&mapBindTest3{}).(*mapBindTest3)
+	i, err := injector.GetInstance(&mapBindTest3{})
+	assert.NoError(t, err)
+	test := i.(*mapBindTest3)
 	testmap := test.Mbp()
 
 	assert.Len(t, testmap, 3)

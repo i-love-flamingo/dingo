@@ -25,13 +25,16 @@ func (s *setupT1) Inject(member1 string, annotated *struct {
 }
 
 func Test_Dingo_Setup(t *testing.T) {
-	injector := NewInjector()
+	injector, err := NewInjector()
+	assert.NoError(t, err)
 	injector.Bind((*string)(nil)).ToInstance("Member 1")
 	injector.Bind((*string)(nil)).AnnotatedWith("annotation2").ToInstance("Member 2")
 	injector.Bind((*string)(nil)).AnnotatedWith("annotation3").ToInstance("Member 3")
 	injector.Bind((*string)(nil)).AnnotatedWith("annotation4").ToInstance("Member 4")
 
-	test := injector.GetInstance((*setupT1)(nil)).(*setupT1)
+	i, err := injector.GetInstance((*setupT1)(nil))
+	assert.NoError(t, err)
+	test := i.(*setupT1)
 
 	assert.Equal(t, test.member1, "Member 1")
 	assert.Equal(t, test.member2, "Member 2")
