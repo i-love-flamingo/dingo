@@ -587,15 +587,8 @@ func (injector *Injector) Bind(what interface{}) *Binding {
 
 // Override a binding
 func (injector *Injector) Override(what interface{}, annotatedWith string) *Binding {
-	bindtype := reflect.TypeOf(what)
-	if bindtype.Kind() == reflect.Ptr {
-		bindtype = bindtype.Elem()
-	}
-	var binding = new(Binding)
-	binding.typeof = bindtype
-
-	injector.overrides = append(injector.overrides, &override{typ: bindtype, annotatedWith: annotatedWith, binding: binding})
-
+	binding := injector.Bind(what).AnnotatedWith(annotatedWith)
+	injector.overrides = append(injector.overrides, &override{typ: binding.typeof, annotatedWith: annotatedWith, binding: binding})
 	return binding
 }
 
