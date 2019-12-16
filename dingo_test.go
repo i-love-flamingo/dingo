@@ -227,3 +227,39 @@ func TestOptional(t *testing.T) {
 	assert.Equal(t, i.(*test).Optional, "option")
 	assert.Equal(t, i.(*test).Optional2, "option")
 }
+
+func TestOverrides(t *testing.T) {
+	t.Run("not annotated", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		injector.Bind(new(string)).ToInstance("test")
+		injector.Bind(new(string)).ToInstance("test-bla")
+		injector.Override(new(string), "").ToInstance("test2")
+		assert.NoError(t, injector.InitModules())
+
+		i, err := injector.GetInstance(new(string))
+		assert.NoError(t, err)
+
+		s, ok := i.(string)
+		assert.True(t, ok)
+		assert.Equal(t, "test2", s)
+	})
+
+	t.Run("annotated", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		injector.Bind(new(string)).AnnotatedWith("test").ToInstance("test")
+		injector.Bind(new(string)).AnnotatedWith("test").ToInstance("test-bla")
+		injector.Override(new(string), "test").ToInstance("test2")
+		assert.NoError(t, injector.InitModules())
+
+		i, err := injector.GetAnnotatedInstance(new(string), "test")
+		assert.NoError(t, err)
+
+		s, ok := i.(string)
+		assert.True(t, ok)
+		assert.Equal(t, "test2", s)
+	})
+}
