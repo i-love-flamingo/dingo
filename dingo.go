@@ -282,7 +282,7 @@ type errUnbound struct {
 }
 
 func (err errUnbound) Error() string {
-	return fmt.Sprintf("binding is not bound: %v for %s", err.binding, err.typ.String())
+	return fmt.Sprintf("binding is not bound: %v for %s", err.binding, err.typ)
 }
 
 func (injector *Injector) resolveBinding(binding *Binding, t reflect.Type, optional bool, circularTrace []circularTraceEntry) (reflect.Value, error) {
