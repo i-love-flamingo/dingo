@@ -324,7 +324,7 @@ func (injector *Injector) internalResolveType(t reflect.Type, annotation string,
 		// todo: go 1.13/1.14: if err == nil || !errors.As(err, new(errUnbound)) {
 		if err == nil {
 			return r, nil
-		} else if err, ok := err.(errUnbound); !ok {
+		} else if _, ok := err.(errUnbound); !ok {
 			return r, err
 		}
 
