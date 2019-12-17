@@ -102,7 +102,10 @@ func (injector *Injector) InitModules(modules ...Module) error {
 
 	modules = resolveDependencies(modules, nil)
 	for _, module := range modules {
-		injector.requestInjection(module, traceCircular)
+		if err := injector.requestInjection(module, traceCircular); err != nil {
+			erroredModule := reflect.TypeOf(module).Elem()
+			return fmtErrorf("initmodules: injection into %q failed: %w", erroredModule.PkgPath()+"."+erroredModule.Name(), err)
+		}
 		module.Configure(injector)
 	}
 
@@ -156,14 +159,27 @@ func (injector *Injector) InitModules(modules ...Module) error {
 	if !injector.buildEagerSingletons {
 		return nil
 	}
+	return injector.BuildEagerSingletons(false)
+}
+
+// SetBuildEagerSingletons can be used to disable or enable building of eager singletons during InitModules
+func (injector *Injector) SetBuildEagerSingletons(build bool) {
+	injector.buildEagerSingletons = build
+}
+
+// BuildEagerSingletons requests one instance of each singleton, optional letting the parent injector(s) do the same
+func (injector *Injector) BuildEagerSingletons(includeParent bool) error {
 	for _, bindings := range injector.bindings {
 		for _, binding := range bindings {
 			if binding.eager {
 				if _, err := injector.getInstance(binding.typeof, binding.annotatedWith, traceCircular); err != nil {
-					return err
+					return fmtErrorf("initmodules: loading eager singletons: %w", err)
 				}
 			}
 		}
+	}
+	if includeParent && injector.parent != nil {
+		return injector.parent.BuildEagerSingletons(includeParent)
 	}
 	return nil
 }
