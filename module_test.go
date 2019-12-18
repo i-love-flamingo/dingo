@@ -3,11 +3,14 @@ package dingo
 import (
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type (
-	tryModuleOk   struct{}
-	tryModuleFail struct{}
+	tryModuleOk    struct{}
+	tryModuleFail  struct{}
+	tryModulePanic struct{}
 )
 
 func (t *tryModuleOk) Configure(injector *Injector) {
@@ -18,16 +21,16 @@ func (t *tryModuleFail) Configure(injector *Injector) {
 	injector.Bind(new(int)).ToInstance("test")
 }
 
-func TestTryModule(t *testing.T) {
-	err := TryModule(new(tryModuleOk))
-	if err != nil {
-		t.Errorf("tryModuleOk{} failed during module load, error: %q", err)
-	}
+func (t *tryModulePanic) Configure(injector *Injector) {
+	injector.Bind(nil)
+}
 
-	err = TryModule(new(tryModuleFail))
-	if err == nil {
-		t.Errorf("tryModuleFail{} did not fail during module load, error: %q", err)
-	}
+func TestTryModule(t *testing.T) {
+	assert.NoError(t, TryModule(new(tryModuleOk)))
+
+	assert.Error(t, TryModule(new(tryModuleFail)))
+
+	assert.Error(t, TryModule(new(tryModulePanic)))
 }
 
 type (

@@ -1,102 +1,103 @@
 package dingo
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 type (
-	Interface interface {
+	testInterface interface {
 		Test() int
 	}
 
-	InterfaceSub Interface
+	interfaceSub testInterface
 
-	InterfaceImpl1 struct {
+	interfaceImpl1 struct {
 		i   int
 		foo string
 	}
 
-	InterfaceImpl2 struct {
+	interfaceImpl2 struct {
 		i int
 	}
 
-	IfaceProvider          func() Interface
-	IfaceWithErrorProvider func() (Interface, error)
+	testInterfaceProvider          func() testInterface
+	testInterfaceWithErrorProvider func() (testInterface, error)
 
-	DepTest struct {
-		Iface  Interface `inject:""`
-		Iface2 Interface `inject:"test"`
+	depTest struct {
+		Iface  testInterface `inject:""`
+		Iface2 testInterface `inject:"test"`
 
-		IfaceProvider          IfaceProvider          `inject:""`
-		IfaceWithErrorProvider IfaceWithErrorProvider `inject:""`
-		IfaceProvided          Interface              `inject:"provider"`
-		IfaceImpl1Provided     Interface              `inject:"providerimpl1"`
-		IfaceInstance          Interface              `inject:"instance"`
+		IfaceProvider          testInterfaceProvider          `inject:""`
+		IfaceWithErrorProvider testInterfaceWithErrorProvider `inject:""`
+		IfaceProvided          testInterface                  `inject:"provider"`
+		IfaceImpl1Provided     testInterface                  `inject:"providerimpl1"`
+		IfaceInstance          testInterface                  `inject:"instance"`
 	}
 
-	TestSingleton struct {
+	testSingleton struct {
 		i int
 	}
 
-	TestModule struct{}
+	testModule struct{}
 
-	PreTestModule struct{}
+	preTestModule struct{}
 )
 
-func InterfaceProvider(str string) Interface {
-	return &InterfaceImpl1{foo: str}
+func InterfaceProvider(str string) testInterface {
+	return &interfaceImpl1{foo: str}
 }
 
-func InterfaceImpl1Provider(str string) *InterfaceImpl1 {
-	return &InterfaceImpl1{foo: str}
+func InterfaceImpl1Provider(str string) *interfaceImpl1 {
+	return &interfaceImpl1{foo: str}
 }
 
-func (ptm *PreTestModule) Configure(injector *Injector) {
+func (ptm *preTestModule) Configure(injector *Injector) {
 	injector.Bind((*string)(nil)).ToInstance("Hello World")
 }
 
-func (tm *TestModule) Configure(injector *Injector) {
-	injector.Bind((*Interface)(nil)).To((*InterfaceSub)(nil))
-	injector.Bind((*InterfaceSub)(nil)).To(InterfaceImpl1{})
-	injector.Bind((*Interface)(nil)).AnnotatedWith("test").To(InterfaceImpl2{})
+func (tm *testModule) Configure(injector *Injector) {
+	injector.Bind((*testInterface)(nil)).To((*interfaceSub)(nil))
+	injector.Bind((*interfaceSub)(nil)).To(interfaceImpl1{})
+	injector.Bind((*testInterface)(nil)).AnnotatedWith("test").To(interfaceImpl2{})
 
-	injector.Bind((*Interface)(nil)).AnnotatedWith("provider").ToProvider(InterfaceProvider)
-	injector.Bind((*Interface)(nil)).AnnotatedWith("providerimpl1").ToProvider(InterfaceImpl1Provider)
-	injector.Bind((*Interface)(nil)).AnnotatedWith("instance").ToInstance(new(InterfaceImpl2))
+	injector.Bind((*testInterface)(nil)).AnnotatedWith("provider").ToProvider(InterfaceProvider)
+	injector.Bind((*testInterface)(nil)).AnnotatedWith("providerimpl1").ToProvider(InterfaceImpl1Provider)
+	injector.Bind((*testInterface)(nil)).AnnotatedWith("instance").ToInstance(new(interfaceImpl2))
 
-	injector.Bind(TestSingleton{}).AsEagerSingleton()
+	injector.Bind(testSingleton{}).AsEagerSingleton()
 }
 
-func (if1 *InterfaceImpl1) Test() int {
+func (if1 *interfaceImpl1) Test() int {
 	return 1
 }
 
-func (if2 *InterfaceImpl2) Test() int {
+func (if2 *interfaceImpl2) Test() int {
 	return 2
 }
 
 func TestDingoResolving(t *testing.T) {
 	t.Run("Should resolve dependencies on request", func(t *testing.T) {
-		injector, err := NewInjector(new(PreTestModule), new(TestModule))
+		injector, err := NewInjector(new(preTestModule), new(testModule))
 		assert.NoError(t, err)
 
-		i, err := injector.GetInstance(new(Interface))
+		i, err := injector.GetInstance(new(testInterface))
 		assert.NoError(t, err)
-		var iface Interface
-		iface = i.(Interface)
+		var iface testInterface
+		iface = i.(testInterface)
 
 		assert.Equal(t, 1, iface.Test())
 
-		i, err = injector.GetInstance(new(DepTest))
+		i, err = injector.GetInstance(new(depTest))
 		assert.NoError(t, err)
-		dt := *i.(*DepTest)
+		dt := *i.(*depTest)
 
 		assert.Equal(t, 1, dt.Iface.Test())
 		assert.Equal(t, 2, dt.Iface2.Test())
 
-		var dt2 DepTest
+		var dt2 depTest
 		assert.NoError(t, injector.requestInjection(&dt2, nil))
 
 		assert.Equal(t, 1, dt2.Iface.Test())
@@ -110,17 +111,17 @@ func TestDingoResolving(t *testing.T) {
 		iface, err = dt.IfaceWithErrorProvider()
 		assert.NoError(t, err)
 		assert.Equal(t, 1, iface.Test())
-		assert.Equal(t, "Hello World", dt.IfaceProvided.(*InterfaceImpl1).foo)
-		assert.Equal(t, "Hello World", dt.IfaceImpl1Provided.(*InterfaceImpl1).foo)
+		assert.Equal(t, "Hello World", dt.IfaceProvided.(*interfaceImpl1).foo)
+		assert.Equal(t, "Hello World", dt.IfaceImpl1Provided.(*interfaceImpl1).foo)
 	})
 
 	t.Run("Should resolve scopes", func(t *testing.T) {
-		injector, err := NewInjector(new(TestModule))
+		injector, err := NewInjector(new(testModule))
 		assert.NoError(t, err)
 
-		i1, err := injector.GetInstance(TestSingleton{})
+		i1, err := injector.GetInstance(testSingleton{})
 		assert.NoError(t, err)
-		i2, err := injector.GetInstance(TestSingleton{})
+		i2, err := injector.GetInstance(testSingleton{})
 		assert.NoError(t, err)
 		assert.Equal(t, i1, i2)
 	})
@@ -132,13 +133,13 @@ func TestDingoResolving(t *testing.T) {
 	})
 }
 
-type testBoundNothingProvider func() *InterfaceImpl1
+type testBoundNothingProvider func() *interfaceImpl1
 
 func TestBoundToNothing(t *testing.T) {
 	injector, err := NewInjector()
 	assert.NoError(t, err)
 
-	injector.Bind(new(InterfaceImpl1)).AnnotatedWith("test")
+	injector.Bind(new(interfaceImpl1)).AnnotatedWith("test")
 
 	i, err := injector.GetInstance(new(testBoundNothingProvider))
 	assert.NoError(t, err)
@@ -264,16 +265,56 @@ func TestOverrides(t *testing.T) {
 	})
 }
 
-func TestSliceProvider(t *testing.T) {
-	injector, err := NewInjector()
-	assert.NoError(t, err)
+func TestProvider(t *testing.T) {
+	t.Run("Provider", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
 
-	injector.Bind(new([]string)).ToProvider(func() []string {
-		return []string{"a", "b"}
+		injector.Bind(new(string)).ToProvider(func(i int) string {
+			return "test" + strconv.Itoa(i)
+		})
+
+		i, err := injector.GetInstance(new(string))
+		assert.NoError(t, err)
+
+		assert.Equal(t, "test0", i.(string))
 	})
 
-	i, err := injector.GetInstance(new([]string))
-	assert.NoError(t, err)
+	t.Run("Slice Provider", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
 
-	assert.Equal(t, []string{"a", "b"}, i.([]string))
+		injector.Bind(new([]string)).ToProvider(func() []string {
+			return []string{"a", "b"}
+		})
+
+		i, err := injector.GetInstance(new([]string))
+		assert.NoError(t, err)
+
+		assert.Equal(t, []string{"a", "b"}, i.([]string))
+	})
+
+	t.Run("Invalid Provider", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		injector.Bind(new(string)).ToProvider(func(interface{}) string {
+			return "test"
+		})
+
+		_, err = injector.GetInstance(new(string))
+		assert.Error(t, err)
+	})
+}
+
+type testInjectInvalid struct {
+	A int `inject:"a"`
+}
+
+func (*testInjectInvalid) Configure(*Injector) {}
+
+func TestInjector_InitModules(t *testing.T) {
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+	assert.Error(t, injector.InitModules(new(testInjectInvalid)))
 }

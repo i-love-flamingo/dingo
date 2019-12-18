@@ -107,6 +107,9 @@ func (p *Provider) Create(injector *Injector) (reflect.Value, error) {
 		if in[i], err = injector.getInstance(p.fnc.Type().In(i), "", traceCircular); err != nil {
 			return reflect.Value{}, err
 		}
+		for in[i].Type() != p.fnc.Type().In(i) {
+			in[i] = in[i].Elem()
+		}
 	}
 	res := p.fnc.Call(in)[0]
 	return res, injector.requestInjection(res, traceCircular)
