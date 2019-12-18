@@ -263,3 +263,17 @@ func TestOverrides(t *testing.T) {
 		assert.Equal(t, "test2", s)
 	})
 }
+
+func TestSliceProvider(t *testing.T) {
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+
+	injector.Bind(new([]string)).ToProvider(func() []string {
+		return []string{"a", "b"}
+	})
+
+	i, err := injector.GetInstance(new([]string))
+	assert.NoError(t, err)
+
+	assert.Equal(t, []string{"a", "b"}, i.([]string))
+}

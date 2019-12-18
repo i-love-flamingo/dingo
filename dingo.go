@@ -307,20 +307,7 @@ func (injector *Injector) resolveBinding(binding *Binding, t reflect.Type, optio
 	}
 
 	if binding.provider != nil {
-		result, err := binding.provider.Create(injector)
-		if err != nil {
-			return reflect.Value{}, err
-		}
-		if result.Kind() == reflect.Slice {
-			if result, err = injector.internalResolveType(result.Type(), "", optional, circularTrace); err != nil {
-				return reflect.Value{}, err
-			}
-		} else {
-			if err := injector.requestInjection(result.Interface(), circularTrace); err != nil {
-				return reflect.Value{}, err
-			}
-		}
-		return result, nil
+		return binding.provider.Create(injector)
 	}
 
 	if binding.to != nil {
