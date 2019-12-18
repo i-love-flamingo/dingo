@@ -46,11 +46,11 @@ type (
 	preTestModule struct{}
 )
 
-func InterfaceProvider(str string) testInterface {
+func interfaceProvider(str string) testInterface {
 	return &interfaceImpl1{foo: str}
 }
 
-func InterfaceImpl1Provider(str string) *interfaceImpl1 {
+func interfaceImpl1Provider(str string) *interfaceImpl1 {
 	return &interfaceImpl1{foo: str}
 }
 
@@ -63,8 +63,8 @@ func (tm *testModule) Configure(injector *Injector) {
 	injector.Bind((*interfaceSub)(nil)).To(interfaceImpl1{})
 	injector.Bind((*testInterface)(nil)).AnnotatedWith("test").To(interfaceImpl2{})
 
-	injector.Bind((*testInterface)(nil)).AnnotatedWith("provider").ToProvider(InterfaceProvider)
-	injector.Bind((*testInterface)(nil)).AnnotatedWith("providerimpl1").ToProvider(InterfaceImpl1Provider)
+	injector.Bind((*testInterface)(nil)).AnnotatedWith("provider").ToProvider(interfaceProvider)
+	injector.Bind((*testInterface)(nil)).AnnotatedWith("providerimpl1").ToProvider(interfaceImpl1Provider)
 	injector.Bind((*testInterface)(nil)).AnnotatedWith("instance").ToInstance(new(interfaceImpl2))
 
 	injector.Bind(testSingleton{}).AsEagerSingleton()
