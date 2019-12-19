@@ -1,5 +1,7 @@
 # Dingo
 
+[![Go Report Card](https://goreportcard.com/badge/flamingo.me/dingo)](https://goreportcard.com/report/flamingo.me/dingo) [![GoDoc](https://godoc.org/flamingo.me/dingo?status.svg)](https://godoc.org/flamingo.me/dingo) [![Build Status](https://travis-ci.org/i-love-flamingo/dingo.svg)](https://travis-ci.org/i-love-flamingo/dingo)
+
 Dependency injection for go
 
 ## Hello Dingo
@@ -470,3 +472,5 @@ func main() {
 
 Recently https://github.com/google/go-cloud/tree/master/wire popped out in the go ecosystem, which seems to be a great choice, also because it supports compile time dependency injection.
 However, when Dingo was first introduced wire was not a thing, and wire still lacks features dingo provides. 
+
+https://gocover.io/github.com/i-love-flamingo/dingo
