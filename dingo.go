@@ -756,7 +756,7 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 			}
 
 		case reflect.Interface:
-			if !current.IsZero() && !current.Elem().IsZero() {
+			if !current.IsNil() {
 				injectlist = append(injectlist, current.Elem())
 			}
 			continue
