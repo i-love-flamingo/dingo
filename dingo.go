@@ -755,6 +755,18 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 				}
 			}
 
+		case reflect.Interface:
+			if !current.IsZero() && !current.Elem().IsZero() {
+				injectlist = append(injectlist, current.Elem())
+			}
+			continue
+
+		case reflect.Slice:
+			for i := 0; i < current.Len(); i++ {
+				injectlist = append(injectlist, current.Index(i))
+			}
+			continue
+
 		default:
 			continue
 		}
