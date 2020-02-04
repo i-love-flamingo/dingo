@@ -109,3 +109,42 @@ func TestScopeWithSubDependencies(t *testing.T) {
 		})
 	}
 }
+
+type inheritedScopeIface interface{}
+type inheritedScopeStruct struct{}
+type inheritedScopeInjected struct {
+	i inheritedScopeIface
+	s *inheritedScopeStruct
+}
+
+func (s *inheritedScopeInjected) Inject(ss *inheritedScopeStruct, si inheritedScopeIface) {
+	s.s = ss
+	s.i = si
+}
+
+func TestInheritedScope(t *testing.T) {
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+
+	injector.Bind(new(inheritedScopeStruct)).In(ChildSingleton)
+	injector.Bind(new(inheritedScopeIface)).To(new(inheritedScopeStruct))
+
+	injector, err = injector.Child()
+	assert.NoError(t, err)
+
+	i, err := injector.GetInstance(new(inheritedScopeInjected))
+	assert.NoError(t, err)
+	firstS := i.(*inheritedScopeInjected)
+	i, err = injector.GetInstance(new(inheritedScopeInjected))
+	assert.NoError(t, err)
+	secondS := i.(*inheritedScopeInjected)
+	assert.Same(t, firstS.s, secondS.s)
+
+	i, err = injector.GetInstance(new(inheritedScopeInjected))
+	assert.NoError(t, err)
+	firstI := i.(*inheritedScopeInjected)
+	i, err = injector.GetInstance(new(inheritedScopeInjected))
+	assert.NoError(t, err)
+	secondI := i.(*inheritedScopeInjected)
+	assert.Same(t, firstI.i, secondI.i)
+}
