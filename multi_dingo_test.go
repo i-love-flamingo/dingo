@@ -232,3 +232,41 @@ func TestMapBindingProvider(t *testing.T) {
 	assert.Equal(t, "testkey2 instance", testmap["testkey2"]())
 	assert.Equal(t, "testkey3 instance", testmap["testkey3"]())
 }
+
+func TestMapBindingSingleton(t *testing.T) {
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+
+	injector.BindMap(new(mapBindInterface), "a").To("a").In(Singleton)
+	injector.BindMap(new(mapBindInterface), "b").To("b")
+
+	i, err := injector.GetInstance(new(mapBindTest1))
+	assert.NoError(t, err)
+
+	first := i.(*mapBindTest1).Mbp()["a"]
+	second := i.(*mapBindTest1).Mbp()["a"]
+
+	assert.True(t, first == second)
+
+	first = i.(*mapBindTest1).Mbp()["b"]
+	second = i.(*mapBindTest1).Mbp()["b"]
+
+	assert.False(t, first == second)
+}
+
+func TestMultiBindingSingleton(t *testing.T) {
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+
+	injector.BindMulti(new(mapBindInterface)).To("a").In(Singleton)
+
+	i, err := injector.GetInstance(new(multiBindTest))
+	assert.NoError(t, err)
+	first := i.(*multiBindTest).Mb[0]
+
+	i, err = injector.GetInstance(new(multiBindTest))
+	assert.NoError(t, err)
+	second := i.(*multiBindTest).Mb[0]
+
+	assert.Same(t, first, second)
+}

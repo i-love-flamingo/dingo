@@ -214,13 +214,15 @@ func (injector *Injector) getInstance(typ interface{}, annotatedWith string, cir
 		}
 	}
 
-	return injector.resolveType(oftype, annotatedWith, false, circularTrace)
+	return injector.getInstanceOfTypeWithAnnotation(oftype, annotatedWith, nil, false, circularTrace)
 }
 
-func (injector *Injector) findBinding(t reflect.Type, annotation string) *Binding {
+func (injector *Injector) findBindingForAnnotatedType(t reflect.Type, annotation string) *Binding {
 	if len(injector.bindings[t]) > 0 {
-		if binding := injector.lookupBinding(t, annotation); binding != nil {
-			return binding
+		for _, binding := range injector.bindings[t] {
+			if binding.annotatedWith == annotation {
+				return binding
+			}
 		}
 	}
 
@@ -231,14 +233,14 @@ func (injector *Injector) findBinding(t reflect.Type, annotation string) *Bindin
 
 	// ask parent
 	if injector.parent != nil {
-		return injector.parent.findBinding(t, annotation)
+		return injector.parent.findBindingForAnnotatedType(t, annotation)
 	}
 
 	return nil
 }
 
-// resolveType resolves a requested type, with annotation
-func (injector *Injector) resolveType(t reflect.Type, annotation string, optional bool, circularTrace []circularTraceEntry) (reflect.Value, error) {
+// getInstanceOfTypeWithAnnotation resolves a requested type, with annotation
+func (injector *Injector) getInstanceOfTypeWithAnnotation(t reflect.Type, annotation string, binding *Binding, optional bool, circularTrace []circularTraceEntry) (reflect.Value, error) {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
@@ -246,12 +248,14 @@ func (injector *Injector) resolveType(t reflect.Type, annotation string, optiona
 	var final reflect.Value
 	var err error
 
-	if binding := injector.findBinding(t, annotation); binding != nil {
+	if typeBinding := injector.findBindingForAnnotatedType(t, annotation); typeBinding != nil {
+		binding = typeBinding
+	}
+	if binding != nil {
 		if binding.scope != nil {
 			if scope, ok := injector.scopes[reflect.TypeOf(binding.scope)]; ok {
-				//final = scope.ResolveType(t, annotation, injector.internalResolveType)
 				if final, err = scope.ResolveType(t, annotation, func(t reflect.Type, annotation string, optional bool) (reflect.Value, error) {
-					return injector.internalResolveType(t, annotation, optional, circularTrace)
+					return injector.createInstanceOfAnnotatedType(t, annotation, optional, circularTrace)
 				}); err != nil {
 					return reflect.Value{}, err
 				}
@@ -265,7 +269,7 @@ func (injector *Injector) resolveType(t reflect.Type, annotation string, optiona
 	}
 
 	if !final.IsValid() {
-		if final, err = injector.internalResolveType(t, annotation, optional, circularTrace); err != nil {
+		if final, err = injector.createInstanceOfAnnotatedType(t, annotation, optional, circularTrace); err != nil {
 			return reflect.Value{}, err
 		}
 	}
@@ -274,22 +278,22 @@ func (injector *Injector) resolveType(t reflect.Type, annotation string, optiona
 		return reflect.Value{}, fmtErrorf("can not resolve %q", t.String())
 	}
 
-	final = injector.intercept(final, t)
-
-	return final, nil
+	return injector.intercept(final, t)
 }
 
-func (injector *Injector) intercept(final reflect.Value, t reflect.Type) reflect.Value {
+func (injector *Injector) intercept(final reflect.Value, t reflect.Type) (reflect.Value, error) {
 	for _, interceptor := range injector.interceptor[t] {
 		of := final
 		final = reflect.New(interceptor)
-		injector.requestInjection(final.Interface(), traceCircular)
+		if err := injector.requestInjection(final.Interface(), traceCircular); err != nil {
+			return reflect.Value{}, err
+		}
 		final.Elem().Field(0).Set(of)
 	}
 	if injector.parent != nil {
 		return injector.parent.intercept(final, t)
 	}
-	return final
+	return final, nil
 }
 
 type errUnbound struct {
@@ -314,15 +318,15 @@ func (injector *Injector) resolveBinding(binding *Binding, t reflect.Type, optio
 		if binding.to == t {
 			return reflect.Value{}, fmtErrorf("circular from %q to %q (annotated with: %q)", t, binding.to, binding.annotatedWith)
 		}
-		return injector.resolveType(binding.to, "", optional, circularTrace)
+		return injector.getInstanceOfTypeWithAnnotation(binding.to, "", binding, optional, circularTrace)
 	}
 
 	return reflect.Value{}, errUnbound{binding: binding, typ: t}
 }
 
-// internalResolveType resolves a type request with the current injector
-func (injector *Injector) internalResolveType(t reflect.Type, annotation string, optional bool, circularTrace []circularTraceEntry) (reflect.Value, error) {
-	if binding := injector.findBinding(t, annotation); binding != nil {
+// createInstanceOfAnnotatedType resolves a type request with the current injector
+func (injector *Injector) createInstanceOfAnnotatedType(t reflect.Type, annotation string, optional bool, circularTrace []circularTraceEntry) (reflect.Value, error) {
+	if binding := injector.findBindingForAnnotatedType(t, annotation); binding != nil {
 		r, err := injector.resolveBinding(binding, t, optional, circularTrace)
 		// todo: go 1.13/1.14: if err == nil || !errors.As(err, new(errUnbound)) {
 		if err == nil {
@@ -333,7 +337,7 @@ func (injector *Injector) internalResolveType(t reflect.Type, annotation string,
 
 		// todo: proper testcases
 		if annotation != "" {
-			return injector.resolveType(binding.typeof, "", false, circularTrace)
+			return injector.getInstanceOfTypeWithAnnotation(binding.typeof, "", binding, false, circularTrace)
 		}
 	}
 
@@ -420,12 +424,12 @@ func (injector *Injector) createProvider(t reflect.Type, annotation string, opti
 
 		// multibindings
 		if res.Elem().Kind() == reflect.Slice {
-			return ret(injector.internalResolveType(t.Out(0), annotation, optional, circularTrace))
+			return ret(injector.createInstanceOfAnnotatedType(t.Out(0), annotation, optional, circularTrace))
 		}
 
 		// mapbindings
 		if res.Elem().Kind() == reflect.Map && res.Elem().Type().Key().Kind() == reflect.String {
-			return ret(injector.internalResolveType(t.Out(0), annotation, optional, circularTrace))
+			return ret(injector.createInstanceOfAnnotatedType(t.Out(0), annotation, optional, circularTrace))
 		}
 
 		r := ret(injector.getInstance(t.Out(0), annotation, circularTrace))
@@ -573,17 +577,6 @@ func (injector *Injector) resolveMapbinding(t reflect.Type, annotation string, o
 	}
 
 	return reflect.MakeMap(t), nil
-}
-
-// lookupBinding search a binding with the corresponding annotation
-func (injector *Injector) lookupBinding(t reflect.Type, annotation string) *Binding {
-	for _, binding := range injector.bindings[t] {
-		if binding.annotatedWith == annotation {
-			return binding
-		}
-	}
-
-	return nil
 }
 
 // BindMulti binds multiple concrete types to the same abstract type / interface
@@ -738,7 +731,7 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 					}
 					tag = strings.Split(tag, ",")[0]
 
-					instance, err := injector.resolveType(field.Type(), tag, optional, circularTrace)
+					instance, err := injector.getInstanceOfTypeWithAnnotation(field.Type(), tag, nil, optional, circularTrace)
 					if err != nil {
 						return wrapErr(err)
 					}
