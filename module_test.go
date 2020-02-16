@@ -33,6 +33,31 @@ func TestTryModule(t *testing.T) {
 	assert.Error(t, TryModule(new(tryModulePanic)))
 }
 
+func TestResolveDependenciesWithModuleFunc(t *testing.T) {
+	var countInline, countExtern int
+
+	ext := ModuleFunc(func(injector *Injector) {
+		countExtern++
+	})
+
+	injector, err := NewInjector(
+		new(tryModuleOk),
+		ModuleFunc(func(injector *Injector) {
+			countInline++
+		}),
+		ModuleFunc(func(injector *Injector) {
+			countInline++
+		}),
+		ext,
+		ext,
+	)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, injector)
+	assert.Equal(t, 2, countInline, "inline modules should be called once (eventually twice for this test)")
+	assert.Equal(t, 1, countExtern, "variable defined modules should only be called once")
+}
+
 type (
 	resolveDependenciesModuleA  struct{}
 	resolveDependenciesModuleB  struct{}

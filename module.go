@@ -1,22 +1,34 @@
 package dingo
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 )
 
 type (
-	// Module is provided by packages to generate the DI tree
+	// Module is default entry point for dingo Modules.
+	// The Configure method is called once during initialization
+	// and let's the module setup Bindings for the provided Injector.
 	Module interface {
 		Configure(injector *Injector)
 	}
 
-	// Depender defines a dependency-aware module
+	// ModuleFunc wraps a func(injector *Injector) for dependency injection.
+	// This allows using small functions as dingo Modules.
+	// The same concept is http.HandlerFunc for http.Handler.
+	ModuleFunc func(injector *Injector)
+
+	// Depender returns a list of Modules via the Depends method.
+	// This allows a module to specify dependencies, which will be loaded before the actual Module is loaded.
 	Depender interface {
 		Depends() []Module
 	}
 )
+
+// Configure call the original ModuleFunc with the given *Injector.
+func (f ModuleFunc) Configure(injector *Injector) {
+	f(injector)
+}
 
 // TryModule tests if modules are properly bound
 func TryModule(modules ...Module) (resultingError error) {
@@ -26,7 +38,7 @@ func TryModule(modules ...Module) (resultingError error) {
 				resultingError = err
 				return
 			}
-			resultingError = errors.New(fmt.Sprint(err))
+			resultingError = fmt.Errorf("dingo.TryModule panic: %q", err)
 		}
 	}()
 
@@ -38,20 +50,26 @@ func TryModule(modules ...Module) (resultingError error) {
 	return injector.InitModules(modules...)
 }
 
+var typeOfModuleFunc = reflect.TypeOf(ModuleFunc(nil))
+
 // resolveDependencies tries to get a complete list of all modules, including all dependencies
 // known can be empty initially, and will then be used for subsequent recursive calls
-func resolveDependencies(modules []Module, known map[reflect.Type]struct{}) []Module {
+func resolveDependencies(modules []Module, known map[interface{}]struct{}) []Module {
 	final := make([]Module, 0, len(modules))
 
 	if known == nil {
-		known = make(map[reflect.Type]struct{})
+		known = make(map[interface{}]struct{})
 	}
 
 	for _, module := range modules {
-		if _, ok := known[reflect.TypeOf(module)]; ok {
+		var identity interface{} = reflect.TypeOf(module)
+		if identity == typeOfModuleFunc {
+			identity = reflect.ValueOf(module)
+		}
+		if _, ok := known[identity]; ok {
 			continue
 		}
-		known[reflect.TypeOf(module)] = struct{}{}
+		known[identity] = struct{}{}
 		if depender, ok := module.(Depender); ok {
 			final = append(final, resolveDependencies(depender.Depends(), known)...)
 		}
