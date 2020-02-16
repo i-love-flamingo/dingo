@@ -474,3 +474,8 @@ Recently https://github.com/google/go-cloud/tree/master/wire popped out in the g
 However, when Dingo was first introduced wire was not a thing, and wire still lacks features dingo provides. 
 
 https://gocover.io/github.com/i-love-flamingo/dingo
+
+## ModuleFunc
+
+Dingo has a wrapper for `func(*Injector)` called `ModuleFunc`. It is possible to wrap a function with the `ModuleFunc` to become a `Module`.
+This is similar to the `http` Packages `HandlerFunc` mechanism and allows to save code and easier set up small projects.
