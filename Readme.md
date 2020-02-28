@@ -50,18 +50,13 @@ package example
 type BillingModule struct {}
 
 func (module *BillingModule) Configure(injector *dingo.Injector) {
-     /*
-      * This tells Dingo that whenever it sees a dependency on a TransactionLog,
-      * it should satisfy the dependency using a DatabaseTransactionLog.
-      */
-    injector.Bind(new(TransactionLog)).To(DatabaseTransactionLog{})
+	// This tells Dingo that whenever it sees a dependency on a TransactionLog, 
+	// it should satisfy the dependency using a DatabaseTransactionLog. 
+	injector.Bind(new(TransactionLog)).To(DatabaseTransactionLog{})
 
-     /*
-      * Similarly, this binding tells Dingo that when CreditCardProcessor is used in
-      * a dependency, that should be satisfied with a PaypalCreditCardProcessor.
-      */
-    injector.Bind(new(CreditCardProcessor)).To(PaypalCreditCardProcessor{})
-  }
+	// Similarly, this binding tells Dingo that when CreditCardProcessor is used in
+	// a dependency, that should be satisfied with a PaypalCreditCardProcessor. 
+	injector.Bind(new(CreditCardProcessor)).To(PaypalCreditCardProcessor{})
 }
 ```
 
@@ -100,9 +95,9 @@ func (m *MyBillingService) Inject(
 		AccountId  string `inject:"config:myModule.myBillingService.accountId"`
 	},
 ) {
-   m.processor = CreditCardProcessor
-   m.accountId = config.AccountId
-   
+	m.processor = CreditCardProcessor
+	m.accountId = config.AccountId
+}
 ```
 
 ### Usage of Providers
@@ -139,12 +134,12 @@ Dingo will provide you with an automatic implementation of a Provider if you did
 
 *Example 1:*
 This is the only code required to request a Provider as a dependency:
-```
+```go
 MyStructProvider func() *MyStruct
 MyStruct         struct {}
 
 MyService struct {
-  MyStructProvider MyStructProvider `inject:""`
+	MyStructProvider MyStructProvider `inject:""`
 }
 
 ```
@@ -154,7 +149,7 @@ MyService struct {
 package example
 
 func createSomething(thing SomethingElse) Something{
-    return &MySomething{somethingElse: thing}
+	return &MySomething{somethingElse: thing}
 }
 
 injector.Bind(new(Something)).ToProvider(createSomething)
@@ -162,7 +157,7 @@ injector.Bind(new(Something)).ToProvider(createSomething)
 type somethingProvider func() Something
 
 type service struct {
-    provider somethingProvider
+	provider somethingProvider
 }
 ```
 
@@ -205,7 +200,7 @@ It is requested via the `inject:"myAnnotation"` tag. For example:
 
 ```go
 struct {
-    PaypalPaymentProcessor PaymentProcessor `inject:"Paypal"`
+	PaypalPaymentProcessor PaymentProcessor `inject:"Paypal"`
 }
 ```
 
@@ -232,9 +227,9 @@ arguments.
 
 ```go
 func MyTypeProvider(se SomethingElse) *MyType {
-    return &MyType{
-        Special: se.DoSomething(),
-    }
+	return &MyType{
+		Special: se.DoSomething(),
+	}
 }
 
 injector.Bind(new(Something)).ToProvider(MyTypeProvider)
@@ -350,7 +345,7 @@ injector.BindMulti(new(Something)).To(MyType1{})
 injector.BindMulti(new(Something)).To(MyType2{})
 
 struct {
-    List []Something `inject:""`  // List is a slice of []Something{MyType1{}, MyType2{}}
+	List []Something `inject:""`  // List is a slice of []Something{MyType1{}, MyType2{}}
 }
 ```
 
@@ -367,7 +362,7 @@ Usually it is easier to request some kind of a registry in your module, and then
 Similiar to Multibindings, but with a key instead of a list
 ```go
 MyService struct {
-  Ifaces map[string]Iface `inject:""`
+	Ifaces map[string]Iface `inject:""`
 }
 
 injector.BindMap(new(Iface), "impl1").To(IfaceImpl{})
@@ -454,17 +449,22 @@ package main
 import "flamingo.me/dingo"
 
 func main() {
-  var injector = dingo.NewInjector()
-  
-  // The injector can be initialized by modules:
-  injector.InitModules(new(BillingModule))
-  
-  /*
-   * Now that we've got the injector, we can build objects.
-   * We get a new instance, and cast it accordingly:
-   */
-  var billingService = injector.GetInstance(new(BillingService)).(BillingService)
-  //...
+	injector, err := dingo.NewInjector()
+	if err != nil {
+		panic(err)
+	}
+
+	// The injector can be initialized by modules:
+	injector.InitModules(new(BillingModule))
+
+	// Now that we've got the injector, we can build objects.
+	// We get a new instance, and cast it accordingly:
+	instance, err := injector.GetInstance(new(BillingService))
+	if err != nil {
+		panic(err)
+	}
+    billingService := instance.(BillingService) 
+	//...
 }
 ```
 
