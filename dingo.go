@@ -15,10 +15,7 @@ const (
 	DEFAULT
 )
 
-var (
-	traceCircular []circularTraceEntry
-	fmtErrorf     = fmt.Errorf
-)
+var traceCircular []circularTraceEntry
 
 // EnableCircularTracing activates dingo's trace feature to find circular dependencies
 // this is super expensive (memory wise), so it should only be used for debugging purposes
@@ -104,7 +101,7 @@ func (injector *Injector) InitModules(modules ...Module) error {
 	for _, module := range modules {
 		if err := injector.requestInjection(module, traceCircular); err != nil {
 			erroredModule := reflect.TypeOf(module).Elem()
-			return fmtErrorf("initmodules: injection into %q failed: %w", erroredModule.PkgPath()+"."+erroredModule.Name(), err)
+			return fmt.Errorf("initmodules: injection into %q failed: %w", erroredModule.PkgPath()+"."+erroredModule.Name(), err)
 		}
 		module.Configure(injector)
 	}
@@ -123,7 +120,7 @@ func (injector *Injector) InitModules(modules ...Module) error {
 			}
 			continue
 		}
-		return fmtErrorf("cannot override unknown binding %q (annotated with %q)", override.typ.String(), override.annotatedWith) // todo ok?
+		return fmt.Errorf("cannot override unknown binding %q (annotated with %q)", override.typ.String(), override.annotatedWith) // todo ok?
 	}
 
 	// make sure there are no duplicated bindings
@@ -138,7 +135,7 @@ func (injector *Injector) InitModules(modules ...Module) error {
 				if binding.to != nil {
 					duplicateBinding = fmt.Sprintf("%#v%#v", binding.to.PkgPath(), binding.to.Name())
 				}
-				return fmtErrorf("already known binding for %q with annotation %q | Known binding: %q Try %q", typ, binding.annotatedWith, knownBinding, duplicateBinding)
+				return fmt.Errorf("already known binding for %q with annotation %q | Known binding: %q Try %q", typ, binding.annotatedWith, knownBinding, duplicateBinding)
 			}
 			known[binding.annotatedWith] = binding
 		}
@@ -173,7 +170,7 @@ func (injector *Injector) BuildEagerSingletons(includeParent bool) error {
 		for _, binding := range bindings {
 			if binding.eager {
 				if _, err := injector.getInstance(binding.typeof, binding.annotatedWith, traceCircular); err != nil {
-					return fmtErrorf("initmodules: loading eager singletons: %w", err)
+					return fmt.Errorf("initmodules: loading eager singletons: %w", err)
 				}
 			}
 		}
@@ -260,10 +257,10 @@ func (injector *Injector) getInstanceOfTypeWithAnnotation(t reflect.Type, annota
 					return reflect.Value{}, err
 				}
 				if !final.IsValid() {
-					return reflect.Value{}, fmtErrorf("%T did not resolve %s", scope, t)
+					return reflect.Value{}, fmt.Errorf("%T did not resolve %s", scope, t)
 				}
 			} else {
-				return reflect.Value{}, fmtErrorf("unknown scope %T for %s", binding.scope, t)
+				return reflect.Value{}, fmt.Errorf("unknown scope %T for %s", binding.scope, t)
 			}
 		}
 	}
@@ -275,7 +272,7 @@ func (injector *Injector) getInstanceOfTypeWithAnnotation(t reflect.Type, annota
 	}
 
 	if !final.IsValid() {
-		return reflect.Value{}, fmtErrorf("can not resolve %q", t.String())
+		return reflect.Value{}, fmt.Errorf("can not resolve %q", t.String())
 	}
 
 	return injector.intercept(final, t)
@@ -316,7 +313,7 @@ func (injector *Injector) resolveBinding(binding *Binding, t reflect.Type, optio
 
 	if binding.to != nil {
 		if binding.to == t {
-			return reflect.Value{}, fmtErrorf("circular from %q to %q (annotated with: %q)", t, binding.to, binding.annotatedWith)
+			return reflect.Value{}, fmt.Errorf("circular from %q to %q (annotated with: %q)", t, binding.to, binding.annotatedWith)
 		}
 		return injector.getInstanceOfTypeWithAnnotation(binding.to, "", binding, optional, circularTrace)
 	}
@@ -328,10 +325,7 @@ func (injector *Injector) resolveBinding(binding *Binding, t reflect.Type, optio
 func (injector *Injector) createInstanceOfAnnotatedType(t reflect.Type, annotation string, optional bool, circularTrace []circularTraceEntry) (reflect.Value, error) {
 	if binding := injector.findBindingForAnnotatedType(t, annotation); binding != nil {
 		r, err := injector.resolveBinding(binding, t, optional, circularTrace)
-		// todo: go 1.13/1.14: if err == nil || !errors.As(err, new(errUnbound)) {
-		if err == nil {
-			return r, nil
-		} else if _, ok := err.(errUnbound); !ok {
+		if err == nil || !errors.As(err, new(errUnbound)) {
 			return r, err
 		}
 
@@ -361,15 +355,15 @@ func (injector *Injector) createInstanceOfAnnotatedType(t reflect.Type, annotati
 	}
 
 	if annotation != "" && !optional {
-		return reflect.Value{}, fmtErrorf("can not automatically create an annotated injection %q with annotation %q", t, annotation)
+		return reflect.Value{}, fmt.Errorf("can not automatically create an annotated injection %q with annotation %q", t, annotation)
 	}
 
 	if t.Kind() == reflect.Interface && !optional {
-		return reflect.Value{}, fmtErrorf("can not instantiate interface %s.%s", t.PkgPath(), t.Name())
+		return reflect.Value{}, fmt.Errorf("can not instantiate interface %s.%s", t.PkgPath(), t.Name())
 	}
 
 	if t.Kind() == reflect.Func && !optional {
-		return reflect.Value{}, fmtErrorf("can not create a new function %q (Do you want a provider? Then suffix type with Provider)", t)
+		return reflect.Value{}, fmt.Errorf("can not create a new function %q (Do you want a provider? Then suffix type with Provider)", t)
 	}
 
 	if circularTrace != nil {
@@ -399,7 +393,7 @@ func reflectedError(err *error, t reflect.Type) reflect.Value {
 	if err == nil || *err == nil {
 		return rerr
 	}
-	rerr.Set(reflect.ValueOf(fmtErrorf("%q: %w", t, *err)))
+	rerr.Set(reflect.ValueOf(fmt.Errorf("%q: %w", t, *err)))
 	return rerr
 }
 
@@ -414,7 +408,7 @@ func (injector *Injector) createProvider(t reflect.Type, annotation string, opti
 
 		ret := func(v reflect.Value, err error) []reflect.Value {
 			if err != nil && !canError {
-				panic(fmtErrorf("%q: %w", t, err))
+				panic(fmt.Errorf("%q: %w", t, err))
 			} else if canError {
 				return []reflect.Value{v, reflectedError(&err, t)}
 			} else {
@@ -464,7 +458,7 @@ func (injector *Injector) createProviderForBinding(t reflect.Type, binding *Bind
 			if canError {
 				return []reflect.Value{res, reflectedError(&err, t)}
 			}
-			panic(fmtErrorf("%q: %w", t, err))
+			panic(fmt.Errorf("%q: %w", t, err))
 		}
 		res.Set(i)
 		// return
@@ -684,7 +678,7 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 		if path != "" {
 			path += "."
 		}
-		return fmtErrorf("injecting into %s%s:\n%w", path, current.String(), err)
+		return fmt.Errorf("injecting into %s%s:\n%w", path, current.String(), err)
 	}
 
 	for {
@@ -719,7 +713,7 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 					field := current.Field(fieldIndex)
 
 					if field.Kind() == reflect.Struct {
-						return fmtErrorf("can not inject into struct %#v of %#v", field, current)
+						return fmt.Errorf("can not inject into struct %#v of %#v", field, current)
 					}
 
 					var optional bool
