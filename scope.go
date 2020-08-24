@@ -72,12 +72,14 @@ func (s *SingletonScope) ResolveType(t reflect.Type, annotation string, unscoped
 				path += "."
 			}
 			path += t.Name()
+			log.Printf("Singleton: timed out waiting for instance lock: type: %q,  annotation: %q", path, annotation)
 			//checkCircular(traceCircular, t, annotation)
 			// trigger traceCircular
 			if traceCircular != nil {
+				checkCircular(traceCircular, t, annotation)
 				unscoped(t, annotation, false)
 			}
-			log.Printf("Singleton: timed out waiting for instance lock: type: %q,  annotation: %q", path, annotation)
+			panic("singleton wait time exceeded")
 		}()
 		l.RLock()
 		ticker.Stop()
