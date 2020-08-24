@@ -148,3 +148,23 @@ func TestInheritedScope(t *testing.T) {
 	secondI := i.(*inheritedScopeInjected)
 	assert.Same(t, firstI.i, secondI.i)
 }
+
+type circSingletonA struct {
+	B *circSingletonB `inject:""`
+}
+type circSingletonB struct {
+	A *circSingletonA `inject:""`
+}
+
+func TestCircularSingletonBinding(t *testing.T) {
+	EnableCircularTracing()
+	defer func() {
+		traceCircular = nil
+	}()
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+	injector.Bind(new(circSingletonA)).In(Singleton)
+	assert.Panics(t, func() {
+		injector.GetInstance(new(circSingletonA))
+	})
+}

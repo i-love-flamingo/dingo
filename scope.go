@@ -1,8 +1,10 @@
 package dingo
 
 import (
+	"log"
 	"reflect"
 	"sync"
+	"time"
 )
 
 type (
@@ -56,7 +58,29 @@ func (s *SingletonScope) ResolveType(t reflect.Type, annotation string, unscoped
 	if l, ok := s.instanceLock[ident]; ok {
 		// we have the instance lock
 		s.mu.Unlock()
+
+		ticker := time.NewTimer(10 * time.Second)
+		go func() {
+			<-ticker.C
+			path := t.PkgPath()
+			if path == "" {
+				if t.Kind() == reflect.Ptr {
+					path = t.Elem().PkgPath()
+				}
+			}
+			if path != "" {
+				path += "."
+			}
+			path += t.Name()
+			//checkCircular(traceCircular, t, annotation)
+			// trigger traceCircular
+			if traceCircular != nil {
+				unscoped(t, annotation, false)
+			}
+			log.Printf("Singleton: timed out waiting for instance lock: type: %q,  annotation: %q", path, annotation)
+		}()
 		l.RLock()
+		ticker.Stop()
 		defer l.RUnlock()
 
 		instance, _ := s.instances.Load(ident)
