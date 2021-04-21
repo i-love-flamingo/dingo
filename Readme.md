@@ -1,6 +1,6 @@
 # Dingo
 
-[![Go Report Card](https://goreportcard.com/badge/flamingo.me/dingo)](https://goreportcard.com/report/flamingo.me/dingo) [![GoDoc](https://godoc.org/flamingo.me/dingo?status.svg)](https://godoc.org/flamingo.me/dingo) [![Build Status](https://travis-ci.org/i-love-flamingo/dingo.svg)](https://travis-ci.org/i-love-flamingo/dingo)
+[![Go Report Card](https://goreportcard.com/badge/flamingo.me/dingo)](https://goreportcard.com/report/flamingo.me/dingo) [![GoDoc](https://godoc.org/flamingo.me/dingo?status.svg)](https://godoc.org/flamingo.me/dingo) [![Tests](https://github.com/i-love-flamingo/dingo/workflows/Tests/badge.svg?branch=master)](https://github.com/i-love-flamingo/dingo/actions?query=branch%3Amaster+workflow%3ATests)
 
 Dependency injection for go
 
