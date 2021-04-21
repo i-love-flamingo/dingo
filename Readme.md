@@ -6,19 +6,19 @@ Dependency injection for go
 
 ## Hello Dingo
 
-Dingo works very very similiar to [Guice](https://github.com/google/guice/wiki/GettingStarted)
+Dingo works very similar to [Guice](https://github.com/google/guice/wiki/GettingStarted)
 
 Basically one binds implementations/factories to interfaces, which are then resolved by Dingo.
 
 Given that Dingo's idea is based on Guice we use similar examples in this documentation:
 
 The following example shows a BillingService with two injected dependencies. Please note
-that Go's nature does not allow contructors, and does not allow decorations/annotations
+that Go's nature does not allow constructors, and does not allow decorations/annotations
 beside struct-tags, thus, we only use struct tags (and later arguments for providers).
 
-Also Go does not have a way to reference types (like Java's `Something.class`) we use either pointers
+Also, Go does not have a way to reference types (like Java's `Something.class`) we use either pointers
 or `nil` and cast it to a pointer to the interface we want to specify: `(*Something)(nil)`.
-Dingo then knowns how to dereference it properly and derive the correct type `Something`.
+Dingo then knows how to dereference it properly and derive the correct type `Something`.
 This is not necessary for structs, where we can just use the null value via `Something{}`.
 
 See the example folder for a complete example.
@@ -130,7 +130,7 @@ Dingo will provide you with an automatic implementation of a Provider if you did
 
 * for lazy binding 
 * if you need new instances on demand
-* In general it is best practice to use a Provider for everything that has a state that might be changed. This way you will avoid undesired side effects. That is especially important for dependencies in objects that are shared between requests - for example a controller!
+* In general, it is best practice using a Provider for everything that has a state that might be changed. This way you will avoid undesired side effects. That is especially important for dependencies in objects that are shared between requests - for example a controller!
 
 *Example 1:*
 This is the only code required to request a Provider as a dependency:
@@ -162,7 +162,7 @@ type service struct {
 ```
 
 will essentially call `createSomething(new(SomethingElse))` everytime `SomethingProvider()` is called,
-passing the resulting instance thru the injection to finalize uninjected fields. 
+passing the resulting instance through the injection to finalize uninjected fields. 
 
 
 ### Optional injection
@@ -188,9 +188,9 @@ injector.Bind(new(Something))
 
 ### AnnotatedWith
 
-By default a binding is unnamend, and thus requested with the `inject:""` tag.
+By default a binding is unnamed, and thus requested with the `inject:""` tag.
 
-However you can name bindings to have more concrete kinds of it. Using `AnnotatedWith` you can specify the name:
+However, you can name bindings to have more concrete kinds of it. Using `AnnotatedWith` you can specify the name:
 
 ```go
 injector.Bind((*Something)(nil)).AnnotatedWith("myAnnotation")
@@ -218,9 +218,9 @@ injector.Bind(new(Something)).To(MyType{})
 
 If you want a factory to create your types then you rather use `ToProvider` instead of `To`.
 
-`ToProvider` is a function which returns an instance (which again will go thru Dingo to fill dependencies).
+`ToProvider` is a function which returns an instance (which again will go through Dingo to fill dependencies).
 
-Also the provider can request arguments from Dingo which are necessary to construct the bounded type.
+Also, the provider can request arguments from Dingo which are necessary to construct the bounded type.
 If you need named arguments (e.g. a string instance annotated with a configuration value) you need to request
 an instance of an object with these annotations, because Go does not allow to pass any meta-information on function
 arguments.
@@ -244,7 +244,7 @@ then take the result of `*MyType` as the value for `Something`.
 
 For situations where you have one, and only one, concrete instance you can use `ToInstance` to bind
 something to the concrete instance. This is not the same as a Singleton!
-(Even though the resuting behaviour is very similar.)
+(Even though the resulting behaviour is very similar.)
 
 ```go
 var myInstance = new(MyType)
@@ -267,7 +267,7 @@ If really necessary it is possible to use singletons
 
 `In` allows us to bind in a scope, making the created instances scoped in a certain way.
 
-Currently Dingo only allows to bind to `dingo.Singleton` and `dingo.ChildSingleton`.
+Currently, Dingo only allows to bind to `dingo.Singleton` and `dingo.ChildSingleton`.
 
 ```go
 injector.Bind(new(Something)).In(dingo.Singleton).To(MyType{})
@@ -287,7 +287,7 @@ the concrete creation to one goroutine via a scope+type specific Mutex which the
 the Singleton and makes it available to other currently waiting injection requests, as
 well as future injection requests.
 
-By default it is advised to not use Singletons whenever possible, and rather use
+By default, it is advised to not use Singletons whenever possible, and rather use
 immutable objects you inject whenever you need them.
 
 #### dingo.ChildSingleton
@@ -352,14 +352,14 @@ struct {
 MultiBindings are used to allow multiple modules to register for a certain type, such as a list of
 encoders, subscribers, etc.
 
-Please not that MultiBindings are not always a clear pattern, as it might hide certain complexity.
+Please note that MultiBindings are not always a clear pattern, as it might hide certain complexity.
 
-Usually it is easier to request some kind of a registry in your module, and then register explicitly.
+Usually it is easier to request some kind of registry in your module, and then register explicitly.
 
 
 ### Bind maps
 
-Similiar to Multibindings, but with a key instead of a list
+Similar to Multibindings, but with a key instead of a list
 ```go
 MyService struct {
 	Ifaces map[string]Iface `inject:""`
