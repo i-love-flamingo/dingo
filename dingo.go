@@ -704,7 +704,6 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 				setup.Call(args)
 			}
 			injectlist = append(injectlist, current.Elem())
-			continue
 
 		// inject into struct fields
 		case reflect.Struct:
@@ -746,16 +745,13 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 			if !current.IsNil() {
 				injectlist = append(injectlist, current.Elem())
 			}
-			continue
 
 		case reflect.Slice:
 			for i := 0; i < current.Len(); i++ {
 				injectlist = append(injectlist, current.Index(i))
 			}
-			continue
 
 		default:
-			continue
 		}
 	}
 	return nil
