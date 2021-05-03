@@ -367,14 +367,8 @@ func (injector *Injector) createInstanceOfAnnotatedType(t reflect.Type, annotati
 	}
 
 	if circularTrace != nil {
-		for _, ct := range circularTrace {
-			if ct.typ == t && ct.annotation == annotation {
-				for _, ct := range circularTrace {
-					log.Println(ct.typ.PkgPath() + "#" + ct.typ.Name() + ": " + ct.annotation)
-				}
-				log.Println(t.PkgPath() + "#" + t.Name() + ": " + annotation)
-				panic("detected circular dependency")
-			}
+		if checkCircular(circularTrace, t, annotation) {
+			panic("detected circular dependency")
 		}
 		subCircularTrace := make([]circularTraceEntry, len(circularTrace))
 		copy(subCircularTrace, circularTrace)
@@ -386,6 +380,19 @@ func (injector *Injector) createInstanceOfAnnotatedType(t reflect.Type, annotati
 
 	n := reflect.New(t)
 	return n, injector.requestInjection(n.Interface(), nil)
+}
+
+func checkCircular(circularTrace []circularTraceEntry, t reflect.Type, annotation string) bool {
+	for _, ct := range circularTrace {
+		if ct.typ == t && ct.annotation == annotation {
+			for _, ct := range circularTrace {
+				log.Println(ct.typ.PkgPath() + "#" + ct.typ.Name() + ": " + ct.annotation)
+			}
+			log.Println(t.PkgPath() + "#" + t.Name() + ": " + annotation)
+			return true
+		}
+	}
+	return false
 }
 
 func reflectedError(err *error, t reflect.Type) reflect.Value {
