@@ -15,13 +15,10 @@ type (
 	interfaceSub testInterface
 
 	interfaceImpl1 struct {
-		i   int
 		foo string
 	}
 
-	interfaceImpl2 struct {
-		i int
-	}
+	interfaceImpl2 struct{}
 
 	testInterfaceProvider          func() testInterface
 	testInterfaceWithErrorProvider func() (testInterface, error)
@@ -37,9 +34,7 @@ type (
 		IfaceInstance          testInterface                  `inject:"instance"`
 	}
 
-	testSingleton struct {
-		i int
-	}
+	testSingleton struct{}
 
 	testModule struct{}
 
