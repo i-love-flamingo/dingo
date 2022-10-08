@@ -626,7 +626,9 @@ func (injector *Injector) BindScope(s Scope) {
 
 // Bind creates a new binding for an abstract type / interface
 // Use the syntax
+//
 //	injector.Bind((*Interface)(nil))
+//
 // To specify the interface (cast it to a pointer to a nil of the type Interface)
 func (injector *Injector) Bind(what interface{}) *Binding {
 	if what == nil {
