@@ -313,3 +313,25 @@ func TestInjector_InitModules(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Error(t, injector.InitModules(new(testInjectInvalid)))
 }
+
+type TestInjectStructRecInterface interface {
+	TestXyz()
+}
+
+type testInjectStructRecStruct struct{}
+
+func (t testInjectStructRecStruct) TestXyz() {}
+
+func (t testInjectStructRecStruct) Inject() {}
+
+func TestInjectStructRec(t *testing.T) {
+	t.Parallel()
+
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+
+	injector.Bind(new(TestInjectStructRecInterface)).To(new(testInjectStructRecStruct))
+
+	_, err = injector.GetInstance(new(TestInjectStructRecInterface))
+	assert.Error(t, err)
+}
