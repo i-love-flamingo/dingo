@@ -335,3 +335,19 @@ func TestInjectStructRec(t *testing.T) {
 	_, err = injector.GetInstance(new(TestInjectStructRecInterface))
 	assert.Error(t, err)
 }
+
+type someStructWithInvalidInterfacePointer struct {
+	A *testInterface `inject:""`
+}
+
+func TestInjectionOfInterfacePointer(t *testing.T) {
+	t.Parallel()
+
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+
+	injector.Bind((*testInterface)(nil)).To(interfaceImpl1{})
+
+	_, err = injector.GetInstance(new(someStructWithInvalidInterfacePointer))
+	assert.Error(t, err, "Expected error")
+}
