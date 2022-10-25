@@ -15,6 +15,7 @@ const (
 	DEFAULT
 )
 
+var ErrInvalidInjectReceiver = errors.New("usage of 'Inject' method with struct receiver is not allowed")
 var traceCircular []circularTraceEntry
 
 // EnableCircularTracing activates dingo's trace feature to find circular dependencies
@@ -692,6 +693,10 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 		ctype := current.Type()
 
 		i++
+
+		if ctype.Kind() != reflect.Ptr && current.MethodByName("Inject").IsValid() {
+			return fmt.Errorf("invalid inject receiver %s: %w", current, ErrInvalidInjectReceiver)
+		}
 
 		switch ctype.Kind() {
 		// dereference pointer
