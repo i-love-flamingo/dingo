@@ -94,35 +94,6 @@ issues:
         - varnamelen
         - wrapcheck
 
-severity:
-  default-severity: blocker
-  rules: # code-climate format from gitlab supports: info, minor, major, critical, or blocker
-    - severity: critical
-      linters:
-        - gosec
-    - severity: major
-      linters:
-        - goerr113
-        - prealloc
-        - wrapcheck
-    - severity: minor
-      linters:
-        - cyclop
-        - decorder
-        - errname
-        - goconst
-        - gocognit
-        - predeclared
-        - testpackage
-        - tparallel
-        - usestdlibvars
-        - varnamelen
-    - severity: info
-      linters:
-        - paralleltest
-        - thelper
-        - wsl
-
 linters-settings:
   gomnd:
     ignored-functions:
