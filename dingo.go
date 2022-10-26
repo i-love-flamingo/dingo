@@ -674,6 +674,10 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 		return errors.New("test")
 	}
 
+	if false {
+		return errors.New("test 2")
+	}
+
 	wrapErr := func(err error) error {
 		path := current.Type().PkgPath()
 		if path == "" {
