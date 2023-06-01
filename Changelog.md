@@ -1,5 +1,14 @@
 # Changelog
 
+## Version v0.2.11 (2023-06-01)
+
+### Chores and tidying
+
+- **deps:** update module github.com/stretchr/testify to v1.8.4 (#59) (8b5d6f5e)
+- add regex to detect go run/install commands (88d11623)
+- **deps:** update module github.com/stretchr/testify to v1.8.2 (#55) (34f5abd5)
+- **deps:** update actions/setup-go action to v4 (#56) (c617aa9b)
+
 ## Version v0.2.10 (2022-11-04)
 
 ### Fixes
