@@ -22,7 +22,7 @@ jobs:
         with:
           fetch-depth: '0'
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v5
         with:
           version: v1.57
           only-new-issues: true
