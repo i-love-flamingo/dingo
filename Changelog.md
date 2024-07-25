@@ -1,5 +1,20 @@
 # Changelog
 
+## Version v0.2.11 (2024-07-25)
+
+### Chores and tidying
+
+- **deps:** update actions/checkout action to v4 (#60) (8e15da8c)
+- **deps:** update actions/setup-go action to v5 (#61) (d87ff516)
+- **deps:** update golangci/golangci-lint-action action to v6 (#66) (bc363bf9)
+- **deps:** update golangci/golangci-lint-action action to v5 (#65) (99893da6)
+- **deps:** update module github.com/stretchr/testify to v1.9.0 (#63) (a327329b)
+- update to go 1.21 minimum (#64) (e7b3183d)
+- **deps:** update module github.com/stretchr/testify to v1.8.4 (#59) (8b5d6f5e)
+- add regex to detect go run/install commands (88d11623)
+- **deps:** update module github.com/stretchr/testify to v1.8.2 (#55) (34f5abd5)
+- **deps:** update actions/setup-go action to v4 (#56) (c617aa9b)
+
 ## Version v0.2.10 (2022-11-04)
 
 ### Fixes
