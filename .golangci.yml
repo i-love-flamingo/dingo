@@ -22,21 +22,20 @@ linters:
     - bodyclose
     - containedctx
     - contextcheck
+    - copyloopvar
     - cyclop
     - durationcheck
+    - err113
     - errcheck
     - errname
     - errorlint
     - exhaustive
-    - exportloopref
     - forbidigo
     - forcetypeassert
     - gocognit
     - goconst
     - gocritic
-    - goerr113
     - gofmt
-    - gomnd
     - gomoddirectives
     - gosec
     - gosimple
@@ -45,6 +44,7 @@ linters:
     - ineffassign
     - makezero
     - misspell
+    - mnd
     - nakedret
     - nestif
     - nilerr
@@ -78,14 +78,14 @@ issues:
     - path: _test\.go
       linters:
         - containedctx
+        - err113
         - forcetypeassert
         - goconst
-        - goerr113
         - varnamelen
         - wrapcheck
 
 linters-settings:
-  gomnd:
+  mnd:
     ignored-functions:
       - context.WithTimeout
   nolintlint:
