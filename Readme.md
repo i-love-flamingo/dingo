@@ -426,16 +426,16 @@ type (
 )
 
 func (t *TplInterceptor) Render(context web.Context, name string, data interface{}) io.Reader {
-	slog.Debug("Before Rendering", name)
+	slog.Info("Before Rendering", name)
 	start := time.Now()
 	r := t.Engine.Render(context, name, data)
-	slog.Debug("After Rendering", time.Since(start))
+	slog.Info("After Rendering", time.Since(start))
 	return r
 }
 
 func (f *FunctionInterceptor) Name() string {
 	funcname := f.Function.Name()
-	slog.Debug("Function", funcname, "used")
+	slog.Info("Function", funcname, "used")
 	return funcname
 }
 ```
