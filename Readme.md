@@ -426,16 +426,16 @@ type (
 )
 
 func (t *TplInterceptor) Render(context web.Context, name string, data interface{}) io.Reader {
-	log.Println("Before Rendering", name)
+	slog.Info("Before Rendering", name)
 	start := time.Now()
 	r := t.Engine.Render(context, name, data)
-	log.Println("After Rendering", time.Since(start))
+	slog.Info("After Rendering", time.Since(start))
 	return r
 }
 
 func (f *FunctionInterceptor) Name() string {
 	funcname := f.Function.Name()
-	log.Println("Function", funcname, "used")
+	slog.Info("Function", funcname, "used")
 	return funcname
 }
 ```
@@ -479,3 +479,7 @@ https://gocover.io/github.com/i-love-flamingo/dingo
 
 Dingo has a wrapper for `func(*Injector)` called `ModuleFunc`. It is possible to wrap a function with the `ModuleFunc` to become a `Module`.
 This is similar to the `http` Packages `HandlerFunc` mechanism and allows to save code and easier set up small projects.
+
+## Troubleshooting
+1. To trace possible circular injections Dingo has function `EnableCircularTracing()`, which also switches slog to DEBUG level. This makes execution very heavy in terms of memory, so should be used only for debug purposes.
+2. To trace possible injection issues, like when Dingo tries to inject dependency into unexported field and fails, and user does not know where this happens, Dingo has `EnableInjectionTracing()`, which is also sets slog level to DEBUG. 
