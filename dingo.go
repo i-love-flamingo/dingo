@@ -27,12 +27,12 @@ var (
 // this is super expensive (memory wise), so it should only be used for debugging purposes
 func EnableCircularTracing() {
 	traceCircular = make([]circularTraceEntry, 0)
-	slog.SetLogLoggerLevel(slog.LevelDebug)
+	_ = slog.SetLogLoggerLevel(slog.LevelDebug)
 }
 
 func EnableInjectionTracing() {
 	injectionTracing = true
-	slog.SetLogLoggerLevel(slog.LevelDebug)
+	_ = slog.SetLogLoggerLevel(slog.LevelDebug)
 }
 
 type (
@@ -384,7 +384,9 @@ func (injector *Injector) createInstanceOfAnnotatedType(t reflect.Type, annotati
 				for _, ct := range circularTrace {
 					slog.Debug(fmt.Sprintf("%s#%s: %s", ct.typ.PkgPath(), ct.typ.Name(), ct.annotation))
 				}
+
 				slog.Debug(fmt.Sprintf("%s#%s: %s", t.PkgPath(), t.Name(), annotation))
+
 				panic("detected circular dependency")
 			}
 		}
