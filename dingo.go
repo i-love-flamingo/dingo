@@ -3,7 +3,7 @@ package dingo
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"reflect"
 	"strings"
 )
@@ -27,10 +27,12 @@ var (
 // this is super expensive (memory wise), so it should only be used for debugging purposes
 func EnableCircularTracing() {
 	traceCircular = make([]circularTraceEntry, 0)
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 }
 
 func EnableInjectionTracing() {
 	injectionTracing = true
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 }
 
 type (
@@ -380,9 +382,9 @@ func (injector *Injector) createInstanceOfAnnotatedType(t reflect.Type, annotati
 		for _, ct := range circularTrace {
 			if ct.typ == t && ct.annotation == annotation {
 				for _, ct := range circularTrace {
-					log.Println(ct.typ.PkgPath() + "#" + ct.typ.Name() + ": " + ct.annotation)
+					slog.Debug(fmt.Sprintf("%s#%s: %s", ct.typ.PkgPath(), ct.typ.Name(), ct.annotation))
 				}
-				log.Println(t.PkgPath() + "#" + t.Name() + ": " + annotation)
+				slog.Debug(fmt.Sprintf("%s#%s: %s", t.PkgPath(), t.Name(), annotation))
 				panic("detected circular dependency")
 			}
 		}
@@ -396,9 +398,9 @@ func (injector *Injector) createInstanceOfAnnotatedType(t reflect.Type, annotati
 
 	if injectionTracing {
 		if t.PkgPath() == "" || t.Name() == "" {
-			log.Println("INJECTING: " + t.String())
+			slog.Debug(fmt.Sprintf("INJECTING: %s", t.String()))
 		} else {
-			log.Println("INJECTING: " + t.PkgPath() + "#" + t.Name() + " \"" + annotation + "\"")
+			slog.Debug(fmt.Sprintf("INJECTING: %s#%s \"%s\"", t.PkgPath(), t.Name(), annotation))
 		}
 	}
 
@@ -759,7 +761,7 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 					}
 					if field.Kind() != reflect.Ptr && field.Kind() != reflect.Interface && instance.Kind() == reflect.Ptr {
 						if injectionTracing {
-							log.Println("SETTING FIELD: \"" + currentFieldName + "\" of type: \"" + ctype.Field(fieldIndex).Type.String() + "\"")
+							slog.Debug(fmt.Sprintf("SETTING FIELD: %s of type \"%s\"", currentFieldName, ctype.Field(fieldIndex).Type.String()))
 						}
 
 						field.Set(instance.Elem())
@@ -769,7 +771,7 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 						}
 
 						if injectionTracing {
-							log.Println("SETTING FIELD: \"" + currentFieldName + "\" of type: \"" + ctype.Field(fieldIndex).Type.String() + "\"")
+							slog.Debug(fmt.Sprintf("SETTING FIELD: %s of type \"%s\"", currentFieldName, ctype.Field(fieldIndex).Type.String()))
 						}
 
 						field.Set(instance)
