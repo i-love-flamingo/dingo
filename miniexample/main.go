@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"log/slog"
 
 	"flamingo.me/dingo"
 	"flamingo.me/dingo/miniexample/logger"
@@ -11,7 +12,7 @@ type stdLogger struct{}
 
 // Log logs a message
 func (s *stdLogger) Log(message string) {
-	log.Println(message)
+	slog.Info(message)
 }
 
 type loggerModule struct{}

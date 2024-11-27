@@ -3,7 +3,7 @@ package dingo
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"reflect"
 	"strings"
 )
@@ -15,14 +15,22 @@ const (
 	DEFAULT
 )
 
-var ErrInvalidInjectReceiver = errors.New("usage of 'Inject' method with struct receiver is not allowed")
-var traceCircular []circularTraceEntry
-var errPointersToInterface = errors.New(" Do not use pointers to interface.")
+var (
+	ErrInvalidInjectReceiver = errors.New("usage of 'Inject' method with struct receiver is not allowed")
+	errPointersToInterface   = errors.New(" Do not use pointers to interface.")
+
+	traceCircular    []circularTraceEntry
+	injectionTracing = false
+)
 
 // EnableCircularTracing activates dingo's trace feature to find circular dependencies
 // this is super expensive (memory wise), so it should only be used for debugging purposes
 func EnableCircularTracing() {
 	traceCircular = make([]circularTraceEntry, 0)
+}
+
+func EnableInjectionTracing() {
+	injectionTracing = true
 }
 
 type (
@@ -372,9 +380,11 @@ func (injector *Injector) createInstanceOfAnnotatedType(t reflect.Type, annotati
 		for _, ct := range circularTrace {
 			if ct.typ == t && ct.annotation == annotation {
 				for _, ct := range circularTrace {
-					log.Println(ct.typ.PkgPath() + "#" + ct.typ.Name() + ": " + ct.annotation)
+					slog.Info(fmt.Sprintf("%s#%s: %s", ct.typ.PkgPath(), ct.typ.Name(), ct.annotation))
 				}
-				log.Println(t.PkgPath() + "#" + t.Name() + ": " + annotation)
+
+				slog.Info(fmt.Sprintf("%s#%s: %s", t.PkgPath(), t.Name(), annotation))
+
 				panic("detected circular dependency")
 			}
 		}
@@ -384,6 +394,14 @@ func (injector *Injector) createInstanceOfAnnotatedType(t reflect.Type, annotati
 
 		n := reflect.New(t)
 		return n, injector.requestInjection(n.Interface(), subCircularTrace)
+	}
+
+	if injectionTracing {
+		if t.PkgPath() == "" || t.Name() == "" {
+			slog.Info(fmt.Sprintf("INJECTING: %s", t.String()))
+		} else {
+			slog.Info(fmt.Sprintf("INJECTING: %s#%s \"%s\"", t.PkgPath(), t.Name(), annotation))
+		}
 	}
 
 	n := reflect.New(t)
@@ -742,11 +760,20 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 						}
 					}
 					if field.Kind() != reflect.Ptr && field.Kind() != reflect.Interface && instance.Kind() == reflect.Ptr {
+						if injectionTracing {
+							slog.Info(fmt.Sprintf("SETTING FIELD: %s of type \"%s\"", currentFieldName, ctype.Field(fieldIndex).Type.String()))
+						}
+
 						field.Set(instance.Elem())
 					} else {
 						if field.Kind() == reflect.Ptr && field.Type().Kind() == reflect.Ptr && field.Type().Elem().Kind() == reflect.Interface {
 							return wrapErr(fmt.Errorf("field %#v is pointer to interface. %w", currentFieldName, errPointersToInterface))
 						}
+
+						if injectionTracing {
+							slog.Info(fmt.Sprintf("SETTING FIELD: %s of type \"%s\"", currentFieldName, ctype.Field(fieldIndex).Type.String()))
+						}
+
 						field.Set(instance)
 					}
 				}

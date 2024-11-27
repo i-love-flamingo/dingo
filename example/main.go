@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"log/slog"
 
 	"flamingo.me/dingo"
 	"flamingo.me/dingo/example/application"
@@ -16,7 +17,7 @@ var _ application.TransactionLog = new(stdloggerTransactionLog)
 
 // Log a message with the configure prefix
 func (s *stdloggerTransactionLog) Log(id, message string) {
-	log.Println(s.prefix, id, message)
+	slog.Info(s.prefix, id, message)
 }
 
 type defaultModule struct{}
