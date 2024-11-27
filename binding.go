@@ -37,6 +37,12 @@ type (
 func (b *Binding) To(what interface{}) *Binding {
 	to := reflect.TypeOf(what)
 
+	if to.Kind() == reflect.Func {
+		if !reflect.ValueOf(what).IsZero() {
+			return b.ToInstance(what)
+		}
+	}
+
 	for to.Kind() == reflect.Ptr {
 		to = to.Elem()
 	}
