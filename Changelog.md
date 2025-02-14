@@ -1,5 +1,11 @@
 # Changelog
 
+## Version v0.3.1 (2025-02-14)
+
+### Chores and tidying
+
+- update to go 1.23 and adjust linter rules (#70) (bc12e054)
+
 ## Version v0.3.0 (2024-11-27)
 
 ### Features
