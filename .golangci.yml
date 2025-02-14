@@ -12,7 +12,6 @@ output:
     - format: colored-line-number
   print-issued-lines: true
   print-linter-name: true
-  uniq-by-line: true
   sort-results: true
 
 linters:
@@ -57,7 +56,6 @@ linters:
     - predeclared
     - revive
     - staticcheck
-    - tenv
     - testpackage
     - thelper
     - tparallel
@@ -66,6 +64,7 @@ linters:
     - unparam
     - unused
     - usestdlibvars
+    - usetesting
     - varnamelen
     - wrapcheck
     - wsl
@@ -74,6 +73,7 @@ issues:
   new: false
   fix: false
   new-from-rev: b5fdfaa2bd30e666511e4648f27d8a26fd8512cb
+  uniq-by-line: true
   exclude-rules:
     - path: _test\.go
       linters:
