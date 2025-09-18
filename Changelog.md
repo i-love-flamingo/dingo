@@ -1,5 +1,13 @@
 # Changelog
 
+## Version v0.3.1 (2025-09-18)
+
+### Chores and tidying
+
+- **deps:** update module github.com/stretchr/testify to v1.11.1 (#76) (edade43e)
+- migrate golangci-lint to v2 (#74) (e7b57e90)
+- update to go 1.23 and adjust linter rules (#70) (bc12e054)
+
 ## Version v0.3.0 (2024-11-27)
 
 ### Features
