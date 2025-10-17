@@ -41,3 +41,21 @@ func Test_Dingo_Setup(t *testing.T) {
 	assert.Equal(t, test.member3, "Member 3")
 	assert.Equal(t, test.Member4, "Member 4")
 }
+
+func Test_Dingo_Setup2(t *testing.T) {
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+	BindInstance[string](injector, "Member 1")
+	BindInstance[string](injector, "Member 2").AnnotatedWith("annotation2")
+	BindInstance(injector, "Member 3").AnnotatedWith("annotation3")
+	BindInstance(injector, "Member 4").AnnotatedWith("annotation4")
+
+	i, err := injector.GetInstance((*setupT1)(nil))
+	assert.NoError(t, err)
+	test := i.(*setupT1)
+
+	assert.Equal(t, test.member1, "Member 1")
+	assert.Equal(t, test.member2, "Member 2")
+	assert.Equal(t, test.member3, "Member 3")
+	assert.Equal(t, test.Member4, "Member 4")
+}

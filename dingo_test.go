@@ -39,6 +39,10 @@ type (
 	testModule struct{}
 
 	preTestModule struct{}
+
+	testModule2 struct{}
+
+	preTestModule2 struct{}
 )
 
 func interfaceProvider(str string) testInterface {
@@ -61,6 +65,32 @@ func (tm *testModule) Configure(injector *Injector) {
 	injector.Bind((*testInterface)(nil)).AnnotatedWith("provider").ToProvider(interfaceProvider)
 	injector.Bind((*testInterface)(nil)).AnnotatedWith("providerimpl1").ToProvider(interfaceImpl1Provider)
 	injector.Bind((*testInterface)(nil)).AnnotatedWith("instance").ToInstance(new(interfaceImpl2))
+
+	injector.Bind(testSingleton{}).AsEagerSingleton()
+}
+
+func (ptm *preTestModule2) Configure(injector *Injector) {
+	BindInstance(injector, "Hello World")
+}
+
+type Prov[T any] interface {
+	Provide() T
+}
+
+type ProvFunc[T any] func() T
+
+func (pf ProvFunc[T]) Provide() T {
+	return pf()
+}
+
+func (tm *testModule2) Configure(injector *Injector) {
+	Bind[testInterface, interfaceSub](injector)
+	Bind[interfaceSub, *interfaceImpl1](injector)
+	BindFor[testInterface](injector, &interfaceImpl2{}).AnnotatedWith("test")
+
+	BindProvider[testInterface](injector, interfaceProvider).AnnotatedWith("provider")
+	BindProvider[testInterface](injector, interfaceImpl1Provider).AnnotatedWith("providerimpl1")
+	BindInstance[testInterface](injector, new(interfaceImpl2)).AnnotatedWith("instance")
 
 	injector.Bind(testSingleton{}).AsEagerSingleton()
 }
@@ -112,6 +142,61 @@ func TestDingoResolving(t *testing.T) {
 
 	t.Run("Should resolve scopes", func(t *testing.T) {
 		injector, err := NewInjector(new(testModule))
+		assert.NoError(t, err)
+
+		i1, err := injector.GetInstance(testSingleton{})
+		assert.NoError(t, err)
+		i2, err := injector.GetInstance(testSingleton{})
+		assert.NoError(t, err)
+		assert.Equal(t, i1, i2)
+	})
+
+	t.Run("Error cases", func(t *testing.T) {
+		var injector *Injector
+		_, err := injector.Child()
+		assert.Error(t, err)
+	})
+}
+
+func TestDingoResolving2(t *testing.T) {
+	t.Run("Should resolve dependencies on request", func(t *testing.T) {
+		injector, err := NewInjector(new(preTestModule2), new(testModule2))
+		assert.NoError(t, err)
+
+		i, err := GetInstance[testInterface](injector)
+		assert.NoError(t, err)
+		var iface testInterface
+		iface = i.(testInterface)
+
+		assert.Equal(t, 1, iface.Test())
+
+		ii, err := injector.GetInstance(new(depTest))
+		assert.NoError(t, err)
+		dt := *ii.(*depTest)
+
+		assert.Equal(t, 1, dt.Iface.Test())
+		assert.Equal(t, 2, dt.Iface2.Test())
+
+		var dt2 depTest
+		assert.NoError(t, injector.requestInjection(&dt2, nil))
+
+		assert.Equal(t, 1, dt2.Iface.Test())
+		assert.Equal(t, 2, dt2.Iface2.Test())
+
+		assert.Equal(t, 1, dt.IfaceProvided.Test())
+		assert.Equal(t, 1, dt.IfaceImpl1Provided.Test())
+		assert.Equal(t, 2, dt.IfaceInstance.Test())
+
+		assert.Equal(t, 1, dt.IfaceProvider().Test())
+		iface, err = dt.IfaceWithErrorProvider()
+		assert.NoError(t, err)
+		assert.Equal(t, 1, iface.Test())
+		assert.Equal(t, "Hello World", dt.IfaceProvided.(*interfaceImpl1).foo)
+		assert.Equal(t, "Hello World", dt.IfaceImpl1Provided.(*interfaceImpl1).foo)
+	})
+
+	t.Run("Should resolve scopes", func(t *testing.T) {
+		injector, err := NewInjector(new(testModule2))
 		assert.NoError(t, err)
 
 		i1, err := injector.GetInstance(testSingleton{})

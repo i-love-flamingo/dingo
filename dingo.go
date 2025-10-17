@@ -200,6 +200,16 @@ func (injector *Injector) GetInstance(of interface{}) (interface{}, error) {
 	return i.Interface(), nil
 }
 
+// GetInstance -
+func GetInstance[T any](injector *Injector) (T, error) {
+	i, err := injector.getInstance(reflect.TypeOf((*T)(nil)).Elem(), "", traceCircular)
+	if err != nil {
+		return *new(T), err
+	}
+
+	return i.Interface().(T), nil
+}
+
 // GetAnnotatedInstance creates a new instance of what was requested with the given annotation
 func (injector *Injector) GetAnnotatedInstance(of interface{}, annotatedWith string) (interface{}, error) {
 	i, err := injector.getInstance(of, annotatedWith, traceCircular)
@@ -207,6 +217,16 @@ func (injector *Injector) GetAnnotatedInstance(of interface{}, annotatedWith str
 		return nil, err
 	}
 	return i.Interface(), nil
+}
+
+// GetAnnotatedInstance -
+func GetAnnotatedInstance[T any](injector *Injector, annotatedWith string) (T, error) {
+	i, err := injector.getInstance(reflect.TypeOf((*T)(nil)).Elem(), annotatedWith, traceCircular)
+	if err != nil {
+		return *new(T), err
+	}
+
+	return i.Interface().(T), nil
 }
 
 // getInstance creates the new instance of typ, returns a reflect.value
@@ -644,12 +664,12 @@ func (injector *Injector) BindScope(s Scope) {
 	injector.scopes[reflect.TypeOf(s)] = s
 }
 
-// Bind creates a new binding for an abstract type / interface
+// BindFor creates a new binding for an abstract type / interface
 // Use the syntax
 //
-//	injector.Bind((*Interface)(nil))
+//	injector.BindFor((*Interface)(nil))
 //
-// To specify the interface (cast it to a pointer to a nil of the type Interface)
+// To specify the interface (cast it to a pointer to nil of the type Interface)
 func (injector *Injector) Bind(what interface{}) *Binding {
 	if what == nil {
 		panic("Cannot bind nil")
@@ -661,6 +681,103 @@ func (injector *Injector) Bind(what interface{}) *Binding {
 	binding := new(Binding)
 	binding.typeof = bindtype
 	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)
+	return binding
+}
+func Bind[T, U any](injector *Injector) *Binding {
+	bindtype := reflect.TypeFor[T]()
+	if bindtype.Kind() == reflect.Ptr {
+		bindtype = bindtype.Elem()
+	}
+
+	binding := new(Binding)
+	binding.typeof = bindtype
+	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)
+
+	to := reflect.TypeFor[U]()
+
+	for to.Kind() == reflect.Ptr {
+		to = to.Elem()
+	}
+
+	if !to.AssignableTo(binding.typeof) && !reflect.PointerTo(to).AssignableTo(binding.typeof) {
+		panic(fmt.Sprintf("%s#%s not assignable to %s#%s", to.PkgPath(), to.Name(), binding.typeof.PkgPath(), binding.typeof.Name()))
+	}
+
+	binding.to = to
+
+	return binding
+}
+
+func BindFor[T any](injector *Injector, what T) *Binding {
+	bindtype := reflect.TypeFor[T]()
+	if bindtype.Kind() == reflect.Ptr {
+		bindtype = bindtype.Elem()
+	}
+
+	binding := new(Binding)
+	binding.typeof = bindtype
+	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)
+
+	to := reflect.TypeOf(what)
+
+	for to.Kind() == reflect.Ptr {
+		to = to.Elem()
+	}
+
+	fmt.Println(bindtype, to)
+
+	if !to.AssignableTo(binding.typeof) && !reflect.PointerTo(to).AssignableTo(binding.typeof) {
+		panic(fmt.Sprintf("%s#%s not assignable to %s#%s", to.PkgPath(), to.Name(), binding.typeof.PkgPath(), binding.typeof.Name()))
+	}
+
+	binding.to = to
+
+	return binding
+}
+
+func BindInstance[T any](injector *Injector, instance T) *Binding {
+	bindtype := reflect.TypeFor[T]()
+	if bindtype.Kind() == reflect.Ptr {
+		bindtype = bindtype.Elem()
+	}
+
+	binding := new(Binding)
+	binding.typeof = bindtype
+	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)
+
+	binding.instance = &Instance{
+		itype:  reflect.TypeOf(instance),
+		ivalue: reflect.ValueOf(instance),
+	}
+	if !binding.instance.itype.AssignableTo(binding.typeof) && !binding.instance.itype.AssignableTo(reflect.PointerTo(binding.typeof)) {
+		panic(fmt.Sprintf("%s#%s not assignable to %s#%s", binding.instance.itype.PkgPath(), binding.instance.itype.Name(), binding.typeof.PkgPath(), binding.typeof.Name()))
+	}
+
+	return binding
+}
+
+func BindProvider[T any](injector *Injector, fn any) *Binding {
+	bindtype := reflect.TypeFor[T]()
+	if bindtype.Kind() == reflect.Ptr {
+		bindtype = bindtype.Elem()
+	}
+
+	binding := new(Binding)
+	binding.typeof = bindtype
+	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)
+
+	provider := &Provider{
+		fnc:     reflect.ValueOf(fn),
+		binding: binding,
+	}
+
+	provider.fnctype = provider.fnc.Type().Out(0)
+	if !provider.fnctype.AssignableTo(binding.typeof) && !provider.fnctype.AssignableTo(reflect.PointerTo(binding.typeof)) {
+		panic(fmt.Sprintf("provider returns %q which is not assignable to %q", provider.fnctype, binding.typeof))
+	}
+
+	binding.provider = provider
+
 	return binding
 }
 
