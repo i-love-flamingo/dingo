@@ -1389,3 +1389,149 @@ func TestBindMulti_NilInjector(t *testing.T) {
 		BindMulti[v2MultiBindInterface, v2MultiImpl1](nil)
 	})
 }
+
+// BindProvider Validation Tests
+
+// TestBindProvider_NotAFunction tests that BindProvider panics when fn is not a function
+func TestBindProvider_NotAFunction(t *testing.T) {
+	t.Run("should panic when fn is a string", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Contains(t, r, "expected function")
+				assert.Contains(t, r, "got string")
+			} else {
+				t.Error("Expected panic but did not panic")
+			}
+		}()
+
+		BindProvider[v2TestInterface](injector, "not a function")
+	})
+
+	t.Run("should panic when fn is an int", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Contains(t, r, "expected function")
+				assert.Contains(t, r, "got int")
+			} else {
+				t.Error("Expected panic but did not panic")
+			}
+		}()
+
+		BindProvider[v2TestInterface](injector, 42)
+	})
+
+	t.Run("should panic when fn is a struct", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Contains(t, r, "expected function")
+				assert.Contains(t, r, "got struct")
+			} else {
+				t.Error("Expected panic but did not panic")
+			}
+		}()
+
+		BindProvider[v2TestInterface](injector, v2TestImpl1{})
+	})
+
+	t.Run("should panic when fn is nil", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Contains(t, r, "expected function")
+			} else {
+				t.Error("Expected panic but did not panic")
+			}
+		}()
+
+		BindProvider[v2TestInterface](injector, nil)
+	})
+}
+
+// TestBindProvider_NoReturnValue tests that BindProvider panics when function has no return value
+func TestBindProvider_NoReturnValue(t *testing.T) {
+	t.Run("should panic when function returns nothing", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Contains(t, r, "must return at least one value")
+			} else {
+				t.Error("Expected panic but did not panic")
+			}
+		}()
+
+		// Function with no return value
+		noReturn := func() {}
+		BindProvider[v2TestInterface](injector, noReturn)
+	})
+}
+
+// TestBindProvider_ValidFunctions tests that BindProvider accepts valid function types
+func TestBindProvider_ValidFunctions(t *testing.T) {
+	t.Run("should accept function with no parameters", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		assert.NotPanics(t, func() {
+			BindProvider[v2TestInterface](injector, func() v2TestInterface {
+				return &v2TestImpl1{value: "test"}
+			})
+		})
+	})
+
+	t.Run("should accept function with parameters", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		assert.NotPanics(t, func() {
+			BindProvider[v2TestInterface](injector, func(s string) v2TestInterface {
+				return &v2TestImpl1{value: s}
+			})
+		})
+	})
+
+	t.Run("should accept function with multiple parameters", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		assert.NotPanics(t, func() {
+			BindProvider[v2TestInterface](injector, func(s string, i int) v2TestInterface {
+				return &v2TestImpl1{value: s}
+			})
+		})
+	})
+
+	t.Run("should accept function returning pointer", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		assert.NotPanics(t, func() {
+			BindProvider[v2TestInterface](injector, func() *v2TestImpl1 {
+				return &v2TestImpl1{value: "test"}
+			})
+		})
+	})
+
+	t.Run("should accept function with error return", func(t *testing.T) {
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		assert.NotPanics(t, func() {
+			BindProvider[v2TestInterface](injector, func() (v2TestInterface, error) {
+				return &v2TestImpl1{value: "test"}, nil
+			})
+		})
+	})
+}

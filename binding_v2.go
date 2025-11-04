@@ -360,12 +360,25 @@ func BindProvider[T any](injector *Injector, fn any) *Binding {
 	binding.typeof = bindtype
 	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)
 
+	// Validate provider function early
+	fnValue := reflect.ValueOf(fn)
+	if fnValue.Kind() != reflect.Func {
+		panic(fmt.Sprintf("dingo: BindProvider[%s]: expected function, got %s",
+			formatTypeName(bindtype), fnValue.Kind()))
+	}
+
+	fnType := fnValue.Type()
+	if fnType.NumOut() == 0 {
+		panic(fmt.Sprintf("dingo: BindProvider[%s]: provider function must return at least one value",
+			formatTypeName(bindtype)))
+	}
+
 	provider := &Provider{
-		fnc:     reflect.ValueOf(fn),
+		fnc:     fnValue,
 		binding: binding,
 	}
 
-	provider.fnctype = provider.fnc.Type().Out(0)
+	provider.fnctype = fnType.Out(0)
 	// For BindProvider, we check if fnctype is assignable to typeof or to *typeof
 	// (not if *fnctype is assignable to typeof, which is what isAssignable does)
 	if !provider.fnctype.AssignableTo(binding.typeof) && !provider.fnctype.AssignableTo(reflect.PointerTo(binding.typeof)) {
