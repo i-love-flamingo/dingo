@@ -269,14 +269,14 @@ func TestBind_ChainableMethods(t *testing.T) {
 	})
 }
 
-// TestBindFor_BasicBinding tests the basic functionality of BindFor[T]
-func TestBindFor_BasicBinding(t *testing.T) {
+// TestBindLike_BasicBinding tests the basic functionality of BindLike[T]
+func TestBindLike_BasicBinding(t *testing.T) {
 	t.Run("should bind interface using runtime value", func(t *testing.T) {
 		injector, err := NewInjector()
 		assert.NoError(t, err)
 
 		impl := &v2TestImpl1{value: "test"}
-		binding := BindFor[v2TestInterface](injector, impl)
+		binding := BindLike[v2TestInterface](injector, impl)
 
 		assert.NotNil(t, binding)
 		assert.Equal(t, reflect.TypeOf((*v2TestInterface)(nil)).Elem(), binding.typeof)
@@ -288,7 +288,7 @@ func TestBindFor_BasicBinding(t *testing.T) {
 		assert.NoError(t, err)
 
 		impl := v2TestImpl2{number: 123}
-		binding := BindFor[v2TestInterface](injector, &impl)
+		binding := BindLike[v2TestInterface](injector, &impl)
 
 		assert.NotNil(t, binding)
 		assert.Equal(t, reflect.TypeOf(v2TestImpl2{}), binding.to)
@@ -299,7 +299,7 @@ func TestBindFor_BasicBinding(t *testing.T) {
 		assert.NoError(t, err)
 
 		impl := &v2TestImpl1{value: "test"}
-		BindFor[v2TestInterface](injector, impl)
+		BindLike[v2TestInterface](injector, impl)
 
 		typ := reflect.TypeOf((*v2TestInterface)(nil)).Elem()
 		assert.Contains(t, injector.bindings, typ)
@@ -307,8 +307,8 @@ func TestBindFor_BasicBinding(t *testing.T) {
 	})
 }
 
-// TestBindFor_PointerHandling tests pointer handling in BindFor[T]
-func TestBindFor_PointerHandling(t *testing.T) {
+// TestBindLike_PointerHandling tests pointer handling in BindLike[T]
+func TestBindLike_PointerHandling(t *testing.T) {
 	t.Run("should strip pointer from T type parameter", func(t *testing.T) {
 		injector, err := NewInjector()
 		assert.NoError(t, err)
@@ -316,7 +316,7 @@ func TestBindFor_PointerHandling(t *testing.T) {
 		// Use a pointer type
 		str := "test"
 		ptr := &str
-		binding := BindFor[*string](injector, ptr)
+		binding := BindLike[*string](injector, ptr)
 
 		assert.Equal(t, reflect.TypeOf(""), binding.typeof)
 	})
@@ -326,7 +326,7 @@ func TestBindFor_PointerHandling(t *testing.T) {
 		assert.NoError(t, err)
 
 		impl := &v2TestImpl1{value: "test"}
-		binding := BindFor[v2TestInterface](injector, impl)
+		binding := BindLike[v2TestInterface](injector, impl)
 
 		assert.Equal(t, reflect.TypeOf(v2TestImpl1{}), binding.to)
 	})
@@ -336,20 +336,20 @@ func TestBindFor_PointerHandling(t *testing.T) {
 		assert.NoError(t, err)
 
 		str := "test"
-		binding := BindFor[string](injector, str)
+		binding := BindLike[string](injector, str)
 
 		assert.Equal(t, reflect.TypeOf(""), binding.to)
 	})
 }
 
-// TestBindFor_AssignabilityValidation tests type assignability validation for BindFor
-func TestBindFor_AssignabilityValidation(t *testing.T) {
+// TestBindLike_AssignabilityValidation tests type assignability validation for BindLike
+func TestBindLike_AssignabilityValidation(t *testing.T) {
 	t.Run("should allow compatible value types", func(t *testing.T) {
 		injector, err := NewInjector()
 		assert.NoError(t, err)
 
 		assert.NotPanics(t, func() {
-			BindFor[v2TestInterface](injector, &v2TestImpl1{value: "ok"})
+			BindLike[v2TestInterface](injector, &v2TestImpl1{value: "ok"})
 		})
 	})
 
@@ -358,7 +358,7 @@ func TestBindFor_AssignabilityValidation(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.NotPanics(t, func() {
-			BindFor[string](injector, "test string")
+			BindLike[string](injector, "test string")
 		})
 	})
 
@@ -368,7 +368,7 @@ func TestBindFor_AssignabilityValidation(t *testing.T) {
 
 		assert.NotPanics(t, func() {
 			str := "test"
-			BindFor[*string](injector, &str)
+			BindLike[*string](injector, &str)
 		})
 	})
 }
@@ -879,14 +879,14 @@ func TestBind_Integration(t *testing.T) {
 	})
 }
 
-// TestBindFor_Integration tests BindFor[T] integration with the DI system
-func TestBindFor_Integration(t *testing.T) {
+// TestBindLike_Integration tests BindLike[T] integration with the DI system
+func TestBindLike_Integration(t *testing.T) {
 	t.Run("should resolve binding via GetInstance", func(t *testing.T) {
 		injector, err := NewInjector()
 		assert.NoError(t, err)
 
-		// BindFor binds to the TYPE, not the instance value
-		BindFor[v2TestInterface](injector, &v2TestImpl1{value: "ignored"})
+		// BindLike binds to the TYPE, not the instance value
+		BindLike[v2TestInterface](injector, &v2TestImpl1{value: "ignored"})
 
 		instance, err := injector.GetInstance((*v2TestInterface)(nil))
 		assert.NoError(t, err)
@@ -901,7 +901,7 @@ func TestBindFor_Integration(t *testing.T) {
 		injector, err := NewInjector()
 		assert.NoError(t, err)
 
-		BindFor[v2TestInterface](injector, &v2TestImpl2{number: 123}).AnnotatedWith("test")
+		BindLike[v2TestInterface](injector, &v2TestImpl2{number: 123}).AnnotatedWith("test")
 
 		instance, err := injector.GetAnnotatedInstance((*v2TestInterface)(nil), "test")
 		assert.NoError(t, err)
@@ -915,7 +915,7 @@ func TestBindFor_Integration(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Pass impl1 but bind to interface
-		BindFor[v2TestInterface](injector, &v2TestImpl1{value: "test"})
+		BindLike[v2TestInterface](injector, &v2TestImpl1{value: "test"})
 
 		// Should create a new v2TestImpl1
 		instance, err := injector.GetInstance((*v2TestInterface)(nil))
@@ -1256,13 +1256,13 @@ func BenchmarkBind(b *testing.B) {
 	}
 }
 
-func BenchmarkBindFor(b *testing.B) {
+func BenchmarkBindLike(b *testing.B) {
 	injector, _ := NewInjector()
 	impl := &v2TestImpl1{value: "test"}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		BindFor[v2TestInterface](injector, impl)
+		BindLike[v2TestInterface](injector, impl)
 	}
 }
 

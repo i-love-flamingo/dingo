@@ -86,7 +86,7 @@ func (pf ProvFunc[T]) Provide() T {
 func (tm *testModule2) Configure(injector *Injector) {
 	Bind[testInterface, interfaceSub](injector)
 	Bind[interfaceSub, *interfaceImpl1](injector)
-	BindFor[testInterface](injector, &interfaceImpl2{}).AnnotatedWith("test")
+	BindLike[testInterface](injector, &interfaceImpl2{}).AnnotatedWith("test")
 
 	BindProvider[testInterface](injector, interfaceProvider).AnnotatedWith("provider")
 	BindProvider[testInterface](injector, interfaceImpl1Provider).AnnotatedWith("providerimpl1")

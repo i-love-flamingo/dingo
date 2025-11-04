@@ -37,6 +37,25 @@ func isAssignable(from, to reflect.Type) bool {
 	return from.AssignableTo(to) || reflect.PointerTo(from).AssignableTo(to)
 }
 
+// formatTypeName formats a reflect.Type for display in error messages.
+// It handles builtin types (which have no PkgPath) and fully-qualified types.
+func formatTypeName(t reflect.Type) string {
+	if t.PkgPath() == "" {
+		// Builtin type (string, int, etc.) or unnamed type
+		return t.String()
+	}
+	return fmt.Sprintf("%s.%s", t.PkgPath(), t.Name())
+}
+
+// formatTypeNotAssignableError creates a consistent error message for type mismatch errors.
+// It includes the function context and properly formatted type names.
+func formatTypeNotAssignableError(from, to reflect.Type, context string) string {
+	return fmt.Sprintf("dingo: %s: type %s is not assignable to %s",
+		context,
+		formatTypeName(from),
+		formatTypeName(to))
+}
+
 func Bind[T, U any](injector *Injector) *Binding {
 	bindtype := typeForNoPtr[T]()
 
@@ -47,7 +66,7 @@ func Bind[T, U any](injector *Injector) *Binding {
 	to := stripAllPtrs(reflect.TypeFor[U]())
 
 	if !isAssignable(to, binding.typeof) {
-		panic(fmt.Sprintf("%s#%s not assignable to %s#%s", to.PkgPath(), to.Name(), binding.typeof.PkgPath(), binding.typeof.Name()))
+		panic(formatTypeNotAssignableError(to, binding.typeof, "Bind[T, U]"))
 	}
 
 	binding.to = to
@@ -55,17 +74,41 @@ func Bind[T, U any](injector *Injector) *Binding {
 	return binding
 }
 
-func BindFor[T any](injector *Injector, what T) *Binding {
+// BindLike binds type T to the same concrete type as the provided example value.
+//
+// The example value is only used to determine the concrete type to bind to.
+// The value itself is NOT stored or used as an instance. If you want to bind
+// a specific instance, use BindInstance instead.
+//
+// This is useful when you want to avoid repeating the full type name, especially
+// for complex types, and let Go infer it from a value.
+//
+// Example:
+//
+//	type UserService interface {
+//	    GetUser(id int) (*User, error)
+//	}
+//
+//	type UserServiceImpl struct {
+//	    db *Database
+//	}
+//
+//	impl := &UserServiceImpl{}
+//	BindLike[UserService](injector, impl)  // Binds UserService to *UserServiceImpl type
+//
+// This creates new instances of *UserServiceImpl when UserService is requested,
+// it does NOT reuse the 'impl' variable.
+func BindLike[T any](injector *Injector, example T) *Binding {
 	bindtype := typeForNoPtr[T]()
 
 	binding := new(Binding)
 	binding.typeof = bindtype
 	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)
 
-	to := stripAllPtrs(reflect.TypeOf(what))
+	to := stripAllPtrs(reflect.TypeOf(example))
 
 	if !isAssignable(to, binding.typeof) {
-		panic(fmt.Sprintf("%s#%s not assignable to %s#%s", to.PkgPath(), to.Name(), binding.typeof.PkgPath(), binding.typeof.Name()))
+		panic(formatTypeNotAssignableError(to, binding.typeof, "BindLike[T]"))
 	}
 
 	binding.to = to
@@ -87,7 +130,7 @@ func BindInstance[T any](injector *Injector, instance T) *Binding {
 	// For BindInstance, we check if itype is assignable to typeof or to *typeof
 	// (not if *itype is assignable to typeof, which is what isAssignable does)
 	if !binding.instance.itype.AssignableTo(binding.typeof) && !binding.instance.itype.AssignableTo(reflect.PointerTo(binding.typeof)) {
-		panic(fmt.Sprintf("%s#%s not assignable to %s#%s", binding.instance.itype.PkgPath(), binding.instance.itype.Name(), binding.typeof.PkgPath(), binding.typeof.Name()))
+		panic(formatTypeNotAssignableError(binding.instance.itype, binding.typeof, "BindInstance[T]"))
 	}
 
 	return binding
@@ -109,7 +152,7 @@ func BindProvider[T any](injector *Injector, fn any) *Binding {
 	// For BindProvider, we check if fnctype is assignable to typeof or to *typeof
 	// (not if *fnctype is assignable to typeof, which is what isAssignable does)
 	if !provider.fnctype.AssignableTo(binding.typeof) && !provider.fnctype.AssignableTo(reflect.PointerTo(binding.typeof)) {
-		panic(fmt.Sprintf("provider returns %q which is not assignable to %q", provider.fnctype, binding.typeof))
+		panic(formatTypeNotAssignableError(provider.fnctype, binding.typeof, "BindProvider[T]"))
 	}
 
 	binding.provider = provider
@@ -126,7 +169,7 @@ func BindMulti[T, U any](injector *Injector) *Binding {
 	to := stripAllPtrs(reflect.TypeFor[U]())
 
 	if !isAssignable(to, binding.typeof) {
-		panic(fmt.Sprintf("%s#%s not assignable to %s#%s", to.PkgPath(), to.Name(), binding.typeof.PkgPath(), binding.typeof.Name()))
+		panic(formatTypeNotAssignableError(to, binding.typeof, "BindMulti[T, U]"))
 	}
 
 	binding.to = to
