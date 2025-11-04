@@ -3,6 +3,7 @@ package dingo
 import (
 	"reflect"
 	"sync"
+	"sync/atomic"
 )
 
 type (
@@ -19,7 +20,7 @@ type (
 	// SingletonScope is our Scope to handle Singletons
 	// todo use RWMutex for proper locking
 	SingletonScope struct {
-		mu           sync.Mutex                   // lock guarding instaceLocks
+		mu           sync.Mutex                   // lock guarding instanceLocks
 		instanceLock map[identifier]*sync.RWMutex // lock guarding instances
 		instances    sync.Map
 	}
@@ -28,13 +29,28 @@ type (
 	ChildSingletonScope SingletonScope
 )
 
+func init() {
+	singletonAtomic.Store(NewSingletonScope())
+	childSingletonAtomic.Store(NewChildSingletonScope())
+}
+
 var (
 	// Singleton is the default SingletonScope for dingo
-	Singleton Scope = NewSingletonScope()
+	Singleton       Scope = NewSingletonScope()
+	singletonAtomic atomic.Pointer[SingletonScope]
 
 	// ChildSingleton is a per-child singleton, means singletons are scoped and local to an injector instance
-	ChildSingleton Scope = NewChildSingletonScope()
+	ChildSingleton       Scope = NewChildSingletonScope()
+	childSingletonAtomic atomic.Pointer[ChildSingletonScope]
 )
+
+func SingletonAtomic() Scope {
+	return singletonAtomic.Load()
+}
+
+func ChildSingletonAtomic() Scope {
+	return childSingletonAtomic.Load()
+}
 
 // NewSingletonScope creates a new singleton scope
 func NewSingletonScope() *SingletonScope {

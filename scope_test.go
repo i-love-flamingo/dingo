@@ -61,11 +61,23 @@ func TestSingleton_ResolveType(t *testing.T) {
 	testScope(t, Singleton)
 }
 
+func TestSingletonAtomic_ResolveType(t *testing.T) {
+	// reset instance
+
+	testScope(t, SingletonAtomic())
+}
+
 func TestChildSingleton_ResolveType(t *testing.T) {
 	// reset instance
 	ChildSingleton = NewChildSingletonScope()
 
 	testScope(t, ChildSingleton)
+}
+
+func TestChildSingletonAtomic_ResolveType(t *testing.T) {
+	// reset instance
+
+	testScope(t, ChildSingletonAtomic())
 }
 
 type (
