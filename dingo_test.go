@@ -165,6 +165,7 @@ func TestDingoResolving2(t *testing.T) {
 
 		i, err := GetInstance[testInterface](injector)
 		assert.NoError(t, err)
+
 		var iface testInterface
 		iface = i.(testInterface)
 
@@ -172,12 +173,14 @@ func TestDingoResolving2(t *testing.T) {
 
 		ii, err := injector.GetInstance(new(depTest))
 		assert.NoError(t, err)
+
 		dt := *ii.(*depTest)
 
 		assert.Equal(t, 1, dt.Iface.Test())
 		assert.Equal(t, 2, dt.Iface2.Test())
 
 		var dt2 depTest
+
 		assert.NoError(t, injector.requestInjection(&dt2, nil))
 
 		assert.Equal(t, 1, dt2.Iface.Test())

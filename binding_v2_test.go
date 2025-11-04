@@ -167,6 +167,7 @@ func TestBind_PointerHandling(t *testing.T) {
 		assert.NoError(t, err)
 
 		type PtrPtr **v2TestImpl1
+
 		binding := Bind[v2TestInterface, PtrPtr](injector)
 
 		assert.Equal(t, reflect.TypeOf(v2TestImpl1{}), binding.to)
@@ -733,6 +734,7 @@ func TestBindMulti_PointerHandling(t *testing.T) {
 		assert.NoError(t, err)
 
 		type PtrPtr **v2MultiImpl1
+
 		binding := BindMulti[v2MultiBindInterface, PtrPtr](injector)
 
 		assert.Equal(t, reflect.TypeOf(v2MultiImpl1{}), binding.to)
@@ -1251,6 +1253,7 @@ func BenchmarkBind(b *testing.B) {
 	injector, _ := NewInjector()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		Bind[v2TestInterface, v2TestImpl1](injector)
 	}
@@ -1261,6 +1264,7 @@ func BenchmarkBindLike(b *testing.B) {
 	impl := &v2TestImpl1{value: "test"}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		BindLike[v2TestInterface](injector, impl)
 	}
@@ -1271,6 +1275,7 @@ func BenchmarkBindInstance(b *testing.B) {
 	impl := &v2TestImpl1{value: "test"}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		BindInstance[v2TestInterface](injector, impl)
 	}
@@ -1283,6 +1288,7 @@ func BenchmarkBindProvider(b *testing.B) {
 	}
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		BindProvider[v2TestInterface](injector, provider)
 	}
@@ -1292,6 +1298,7 @@ func BenchmarkBindMulti(b *testing.B) {
 	injector, _ := NewInjector()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		BindMulti[v2MultiBindInterface, v2MultiImpl1](injector)
 	}
@@ -1303,6 +1310,7 @@ func BenchmarkBindResolution(b *testing.B) {
 	_ = injector.InitModules()
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		_, _ = GetInstance[v2TestInterface](injector)
 	}

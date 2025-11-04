@@ -52,6 +52,7 @@ func Test_Dingo_Setup2(t *testing.T) {
 
 	i, err := injector.GetInstance((*setupT1)(nil))
 	assert.NoError(t, err)
+
 	test := i.(*setupT1)
 
 	assert.Equal(t, test.member1, "Member 1")

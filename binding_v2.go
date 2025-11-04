@@ -23,6 +23,7 @@ func stripPtrType(t reflect.Type) reflect.Type {
 	if t.Kind() == reflect.Ptr {
 		return t.Elem()
 	}
+
 	return t
 }
 
@@ -38,6 +39,7 @@ func stripAllPtrs(t reflect.Type) reflect.Type {
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
+
 	return t
 }
 
@@ -82,6 +84,7 @@ func formatTypeName(t reflect.Type) string {
 		// Builtin type (string, int, etc.) or unnamed type
 		return t.String()
 	}
+
 	return fmt.Sprintf("%s.%s", t.PkgPath(), t.Name())
 }
 
@@ -308,7 +311,7 @@ func BindInstance[T any](injector *Injector, instance T) *Binding {
 //
 // Parameters:
 //   - injector: The injector to add the binding to
-//   - fn: A function that returns T (can have any number of injected parameters)
+//   - providerFunc: A function that returns T (can have any number of injected parameters)
 //
 // Returns:
 //   - *Binding: A chainable binding that can be configured with AnnotatedWith(), In(), etc.
@@ -346,10 +349,10 @@ func BindInstance[T any](injector *Injector, instance T) *Binding {
 //
 // Panics if:
 //   - injector is nil
-//   - fn is not a function
-//   - fn does not return a value
-//   - fn's return type is not assignable to T
-func BindProvider[T any](injector *Injector, fn any) *Binding {
+//   - providerFunc is not a function
+//   - providerFunc does not return a value
+//   - providerFunc's return type is not assignable to T
+func BindProvider[T any](injector *Injector, providerFunc any) *Binding {
 	if injector == nil {
 		panic("dingo: BindProvider[T]: injector cannot be nil")
 	}
@@ -361,7 +364,7 @@ func BindProvider[T any](injector *Injector, fn any) *Binding {
 	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)
 
 	// Validate provider function early
-	fnValue := reflect.ValueOf(fn)
+	fnValue := reflect.ValueOf(providerFunc)
 	if fnValue.Kind() != reflect.Func {
 		panic(fmt.Sprintf("dingo: BindProvider[%s]: expected function, got %s",
 			formatTypeName(bindtype), fnValue.Kind()))
