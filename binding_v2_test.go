@@ -1307,3 +1307,85 @@ func BenchmarkBindResolution(b *testing.B) {
 		_, _ = GetInstance[v2TestInterface](injector)
 	}
 }
+
+// Nil Injector Tests
+
+// TestBind_NilInjector tests that Bind panics with clear message when injector is nil
+func TestBind_NilInjector(t *testing.T) {
+	t.Run("should panic with descriptive error", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Contains(t, r, "Bind[T, U]: injector cannot be nil")
+			} else {
+				t.Error("Expected panic but did not panic")
+			}
+		}()
+
+		Bind[v2TestInterface, v2TestImpl1](nil)
+	})
+}
+
+// TestBindLike_NilInjector tests that BindLike panics with clear message when injector is nil
+func TestBindLike_NilInjector(t *testing.T) {
+	t.Run("should panic with descriptive error", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Contains(t, r, "BindLike[T]: injector cannot be nil")
+			} else {
+				t.Error("Expected panic but did not panic")
+			}
+		}()
+
+		impl := &v2TestImpl1{value: "test"}
+		BindLike[v2TestInterface](nil, impl)
+	})
+}
+
+// TestBindInstance_NilInjector tests that BindInstance panics with clear message when injector is nil
+func TestBindInstance_NilInjector(t *testing.T) {
+	t.Run("should panic with descriptive error", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Contains(t, r, "BindInstance[T]: injector cannot be nil")
+			} else {
+				t.Error("Expected panic but did not panic")
+			}
+		}()
+
+		impl := &v2TestImpl1{value: "test"}
+		BindInstance[v2TestInterface](nil, impl)
+	})
+}
+
+// TestBindProvider_NilInjector tests that BindProvider panics with clear message when injector is nil
+func TestBindProvider_NilInjector(t *testing.T) {
+	t.Run("should panic with descriptive error", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Contains(t, r, "BindProvider[T]: injector cannot be nil")
+			} else {
+				t.Error("Expected panic but did not panic")
+			}
+		}()
+
+		provider := func() v2TestInterface {
+			return &v2TestImpl1{value: "test"}
+		}
+		BindProvider[v2TestInterface](nil, provider)
+	})
+}
+
+// TestBindMulti_NilInjector tests that BindMulti panics with clear message when injector is nil
+func TestBindMulti_NilInjector(t *testing.T) {
+	t.Run("should panic with descriptive error", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Contains(t, r, "BindMulti[T, U]: injector cannot be nil")
+			} else {
+				t.Error("Expected panic but did not panic")
+			}
+		}()
+
+		BindMulti[v2MultiBindInterface, v2MultiImpl1](nil)
+	})
+}

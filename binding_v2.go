@@ -147,6 +147,10 @@ func formatTypeNotAssignableError(from, to reflect.Type, context string) string 
 //   - injector is nil
 //   - U is not assignable to T (checked at binding time)
 func Bind[T, U any](injector *Injector) *Binding {
+	if injector == nil {
+		panic("dingo: Bind[T, U]: injector cannot be nil")
+	}
+
 	bindtype := typeForNoPtr[T]()
 
 	binding := new(Binding)
@@ -208,6 +212,10 @@ func Bind[T, U any](injector *Injector) *Binding {
 //   - injector is nil
 //   - The example's type is not assignable to T
 func BindLike[T any](injector *Injector, example T) *Binding {
+	if injector == nil {
+		panic("dingo: BindLike[T]: injector cannot be nil")
+	}
+
 	bindtype := typeForNoPtr[T]()
 
 	binding := new(Binding)
@@ -266,6 +274,10 @@ func BindLike[T any](injector *Injector, example T) *Binding {
 //   - injector is nil
 //   - The instance type is not assignable to T
 func BindInstance[T any](injector *Injector, instance T) *Binding {
+	if injector == nil {
+		panic("dingo: BindInstance[T]: injector cannot be nil")
+	}
+
 	bindtype := typeForNoPtr[T]()
 
 	binding := new(Binding)
@@ -338,6 +350,10 @@ func BindInstance[T any](injector *Injector, instance T) *Binding {
 //   - fn does not return a value
 //   - fn's return type is not assignable to T
 func BindProvider[T any](injector *Injector, fn any) *Binding {
+	if injector == nil {
+		panic("dingo: BindProvider[T]: injector cannot be nil")
+	}
+
 	bindtype := typeForNoPtr[T]()
 
 	binding := new(Binding)
@@ -413,6 +429,10 @@ func BindProvider[T any](injector *Injector, fn any) *Binding {
 //   - injector is nil
 //   - U is not assignable to T
 func BindMulti[T, U any](injector *Injector) *Binding {
+	if injector == nil {
+		panic("dingo: BindMulti[T, U]: injector cannot be nil")
+	}
+
 	bindtype := typeForNoPtr[T]()
 
 	binding := new(Binding)
