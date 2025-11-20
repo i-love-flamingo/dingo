@@ -5,60 +5,97 @@ import (
 	"reflect"
 )
 
-// Bind creates a new type-safe binding for type T.
-// Returns *Binding for compatibility with the existing API, allowing method chaining.
+// BindingOption is a functional option for configuring bindings.
+// This follows the Go idiom of functional options for clean, extensible configuration.
 //
-// FAIL FAST: Performs validation at binding time to ensure proper configuration.
+// Example:
+//
+//	Bind[Logger, *ConsoleLogger](injector, WithAnnotation("console"), AsSingleton())
+type BindingOption func(*Binding)
+
+// WithAnnotation sets the binding's annotation name.
+// Annotations allow multiple bindings of the same type to coexist.
+//
+// Example:
+//
+//	Bind[Logger, *ConsoleLogger](injector, WithAnnotation("console"))
+//	Bind[Logger, *FileLogger](injector, WithAnnotation("file"))
+func WithAnnotation(annotation string) BindingOption {
+	return func(b *Binding) {
+		if annotation == "" {
+			panic("binding validation failed: annotation cannot be empty string")
+		}
+		b.annotatedWith = annotation
+	}
+}
+
+// WithScope sets the binding's scope.
+// Common scopes are Singleton and ChildSingleton.
+//
+// Example:
+//
+//	Bind[Database, *PostgresDB](injector, WithScope(Singleton))
+func WithScope(scope Scope) BindingOption {
+	return func(b *Binding) {
+		if scope == nil {
+			panic("binding validation failed: scope cannot be nil")
+		}
+		b.scope = scope
+	}
+}
+
+// AsSingleton is a convenience option that sets the scope to Singleton.
+// Singletons are shared across the entire application.
+//
+// Example:
+//
+//	Bind[Database, *PostgresDB](injector, AsSingleton())
+func AsSingleton() BindingOption {
+	return WithScope(Singleton)
+}
+
+// AsChildSingleton is a convenience option that sets the scope to ChildSingleton.
+// Child singletons are shared within a child injector but not across parent/child boundaries.
+//
+// Example:
+//
+//	Bind[RequestContext, *Context](injector, AsChildSingleton())
+func AsChildSingleton() BindingOption {
+	return WithScope(ChildSingleton)
+}
+
+// AsEagerSingleton marks the binding as an eager singleton.
+// Eager singletons are instantiated immediately when the injector is initialized.
+//
+// Example:
+//
+//	Bind[AppInitializer, *Initializer](injector, AsEagerSingleton())
+func AsEagerSingleton() BindingOption {
+	return func(b *Binding) {
+		b.scope = Singleton
+		b.eager = true
+	}
+}
+
+// Bind creates a type-safe binding from interface/type F to concrete type T.
+// This is the main entry point for the generic binding API, combining both the
+// "what to bind" and "what to bind to" in a single function call.
+//
+// FAIL FAST: Performs comprehensive validation at binding time to ensure:
+//   - T is assignable to F
+//   - All options are valid
 //
 // Example:
 //
 //	// Basic binding
-//	Bind[MyInterface](injector).To(MyImpl{})
+//	Bind[Logger, *ConsoleLogger](injector)
 //
-//	// With configuration
-//	Bind[MyInterface](injector).To(MyImpl{}).AnnotatedWith("special").In(Singleton)
+//	// With options
+//	Bind[Logger, *ConsoleLogger](injector, WithAnnotation("console"), AsSingleton())
 //
-//	// Bind to instance
-//	Bind[MyInterface](injector).ToInstance(myInstance)
-//
-//	// Bind to provider
-//	Bind[MyInterface](injector).ToProvider(myProviderFunc)
-func Bind[T any](injector *Injector) *Binding {
-	if injector == nil {
-		panic("cannot bind on nil injector")
-	}
-
-	bindtype := reflect.TypeOf((*T)(nil)).Elem()
-
-	// FAIL FAST: Validate that we're not binding nil
-	if bindtype == nil {
-		panic("cannot bind nil type")
-	}
-
-	binding := &Binding{
-		typeof: bindtype,
-	}
-
-	// Add to injector's bindings
-	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)
-
-	return binding
-}
-
-// BindTo creates a type-safe binding from interface F to concrete type T.
-// This validates at binding time that T is assignable to F, providing fail-fast behavior.
-//
-// FAIL FAST: Compile-time check that T satisfies F (when both are concrete),
-// plus runtime validation of assignability.
-//
-// Example:
-//
-//	// Explicit type relationship with validation
-//	BindTo[MyInterface, *MyImpl](injector).AnnotatedWith("v2")
-//
-//	// This is safer than Bind + To because both types are specified upfront
-//	BindTo[Database, *PostgresDB](injector).In(Singleton)
-func BindTo[F, T any](injector *Injector) *Binding {
+//	// Database with eager singleton
+//	Bind[Database, *PostgresDB](injector, AsEagerSingleton())
+func Bind[F, T any](injector *Injector, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot bind on nil injector")
 	}
@@ -94,6 +131,11 @@ func BindTo[F, T any](injector *Injector) *Binding {
 		to:     actualToType,
 	}
 
+	// Apply functional options
+	for _, opt := range opts {
+		opt(binding)
+	}
+
 	// Add to injector's bindings
 	injector.bindings[fromType] = append(injector.bindings[fromType], binding)
 
@@ -101,15 +143,18 @@ func BindTo[F, T any](injector *Injector) *Binding {
 }
 
 // BindInstance creates a binding to a specific instance with type safety.
-// This is a convenience function that validates the instance at binding time.
+// The type T is inferred from the instance parameter.
 //
-// FAIL FAST: Validates instance type is assignable to T.
+// FAIL FAST: Validates instance type at binding time.
 //
 // Example:
 //
 //	db := &PostgresDB{connectionString: "localhost"}
-//	BindInstance[Database](injector, db).In(Singleton)
-func BindInstance[T any](injector *Injector, instance T) *Binding {
+//	BindInstance[Database](injector, db, AsSingleton())
+//
+//	logger := &FileLogger{path: "/var/log/app.log"}
+//	BindInstance[Logger](injector, logger, WithAnnotation("file"))
+func BindInstance[T any](injector *Injector, instance T, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot bind on nil injector")
 	}
@@ -143,6 +188,11 @@ func BindInstance[T any](injector *Injector, instance T) *Binding {
 		},
 	}
 
+	// Apply functional options
+	for _, opt := range opts {
+		opt(binding)
+	}
+
 	// Add to injector's bindings
 	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)
 
@@ -158,8 +208,8 @@ func BindInstance[T any](injector *Injector, instance T) *Binding {
 //
 //	BindProvider[Logger](injector, func() Logger {
 //	    return &ConsoleLogger{}
-//	}).AsSingleton()
-func BindProvider[T any](injector *Injector, provider func() T) *Binding {
+//	}, AsSingleton())
+func BindProvider[T any](injector *Injector, provider func() T, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot bind on nil injector")
 	}
@@ -167,7 +217,7 @@ func BindProvider[T any](injector *Injector, provider func() T) *Binding {
 		panic("cannot bind to nil provider")
 	}
 
-	return BindProviderFunc[T](injector, provider)
+	return BindProviderFunc[T](injector, provider, opts...)
 }
 
 // BindProviderWithError creates a binding to a provider that can return errors.
@@ -176,8 +226,8 @@ func BindProvider[T any](injector *Injector, provider func() T) *Binding {
 //
 //	BindProviderWithError[Database](injector, func() (Database, error) {
 //	    return connectDB()
-//	})
-func BindProviderWithError[T any](injector *Injector, provider func() (T, error)) *Binding {
+//	}, AsSingleton())
+func BindProviderWithError[T any](injector *Injector, provider func() (T, error), opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot bind on nil injector")
 	}
@@ -185,7 +235,7 @@ func BindProviderWithError[T any](injector *Injector, provider func() (T, error)
 		panic("cannot bind to nil provider")
 	}
 
-	return BindProviderFunc[T](injector, provider)
+	return BindProviderFunc[T](injector, provider, opts...)
 }
 
 // BindProviderFunc creates a binding to a provider function with automatic dependency injection.
@@ -206,8 +256,8 @@ func BindProviderWithError[T any](injector *Injector, provider func() (T, error)
 //	// With error handling
 //	BindProviderFunc[Database](injector, func(config Config) (Database, error) {
 //	    return connectDB(config)
-//	})
-func BindProviderFunc[T any](injector *Injector, providerFunc interface{}) *Binding {
+//	}, AsSingleton())
+func BindProviderFunc[T any](injector *Injector, providerFunc interface{}, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot bind on nil injector")
 	}
@@ -275,6 +325,11 @@ func BindProviderFunc[T any](injector *Injector, providerFunc interface{}) *Bind
 		},
 	}
 	binding.provider.binding = binding
+
+	// Apply functional options
+	for _, opt := range opts {
+		opt(binding)
+	}
 
 	// Add to injector's bindings
 	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)

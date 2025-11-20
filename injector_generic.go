@@ -152,27 +152,115 @@ func MustRequestInjection[T any](injector *Injector, object T) {
 	}
 }
 
-// Override creates a typed override for an existing binding.
+// Override creates a typed override for an existing binding from type F to type T.
 // This is useful for testing or providing alternative implementations.
+//
+// The annotation parameter specifies which binding to override (empty string for non-annotated bindings).
 //
 // Example:
 //
 //	// In tests, override production database with mock
-//	Override[Database](injector, "").ToInstance(mockDB)
-func Override[T any](injector *Injector, annotation string) *BindingBuilder[T] {
+//	Override[Database, *MockDB](injector, "")
+//
+//	// Override annotated binding
+//	Override[Logger, *TestLogger](injector, "file", AsSingleton())
+func Override[F, T any](injector *Injector, annotation string, opts ...BindingOption) *Binding {
+	if injector == nil {
+		panic("cannot create override on nil injector")
+	}
+
+	fromType := reflect.TypeOf((*F)(nil)).Elem()
+	toType := reflect.TypeOf((*T)(nil)).Elem()
+
+	// FAIL FAST: Validate types
+	if fromType == nil {
+		panic("cannot create override from nil type")
+	}
+	if toType == nil {
+		panic("cannot create override to nil type")
+	}
+
+	// Handle pointer types
+	actualToType := toType
+	for actualToType.Kind() == reflect.Ptr {
+		actualToType = actualToType.Elem()
+	}
+
+	// FAIL FAST: Validate assignability at binding time
+	if !actualToType.AssignableTo(fromType) && !reflect.PtrTo(actualToType).AssignableTo(fromType) {
+		panic(fmt.Sprintf(
+			"override validation failed: %s#%s is not assignable to %s#%s",
+			actualToType.PkgPath(), actualToType.Name(),
+			fromType.PkgPath(), fromType.Name(),
+		))
+	}
+
+	binding := &Binding{
+		typeof:        fromType,
+		to:            actualToType,
+		annotatedWith: annotation,
+	}
+
+	// Apply functional options
+	for _, opt := range opts {
+		opt(binding)
+	}
+
+	// Add to overrides list
+	injector.overrides = append(injector.overrides, &override{
+		typ:           fromType,
+		annotatedWith: annotation,
+		binding:       binding,
+	})
+
+	return binding
+}
+
+// OverrideInstance creates a typed override for an existing binding using an instance.
+// This is useful for testing or providing pre-configured instances.
+//
+// Example:
+//
+//	mockDB := &MockDB{}
+//	OverrideInstance[Database](injector, "", mockDB)
+func OverrideInstance[T any](injector *Injector, annotation string, instance T, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot create override on nil injector")
 	}
 
 	bindtype := reflect.TypeOf((*T)(nil)).Elem()
+	instanceType := reflect.TypeOf(instance)
+	instanceValue := reflect.ValueOf(instance)
 
+	// FAIL FAST: Validate types
 	if bindtype == nil {
 		panic("cannot create override for nil type")
+	}
+	if instanceType == nil {
+		panic("cannot create override with nil instance")
+	}
+
+	// FAIL FAST: Validate assignability
+	if !instanceType.AssignableTo(bindtype) && !instanceType.AssignableTo(reflect.PtrTo(bindtype)) {
+		panic(fmt.Sprintf(
+			"override validation failed: instance of type %s#%s is not assignable to %s#%s",
+			instanceType.PkgPath(), instanceType.Name(),
+			bindtype.PkgPath(), bindtype.Name(),
+		))
 	}
 
 	binding := &Binding{
 		typeof:        bindtype,
 		annotatedWith: annotation,
+		instance: &Instance{
+			itype:  instanceType,
+			ivalue: instanceValue,
+		},
+	}
+
+	// Apply functional options
+	for _, opt := range opts {
+		opt(binding)
 	}
 
 	// Add to overrides list
@@ -182,10 +270,7 @@ func Override[T any](injector *Injector, annotation string) *BindingBuilder[T] {
 		binding:       binding,
 	})
 
-	return &BindingBuilder[T]{
-		injector: injector,
-		binding:  binding,
-	}
+	return binding
 }
 
 // BindInterceptor binds an interceptor for type T.

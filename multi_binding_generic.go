@@ -5,18 +5,17 @@ import (
 	"reflect"
 )
 
-// BindMulti creates a new type-safe multi-binding for type T.
+// BindMulti creates a type-safe multi-binding from interface/type F to concrete type T.
 // Multi-bindings allow multiple implementations to be registered and injected as a slice.
 //
-// Returns *Binding for compatibility with the existing API, allowing method chaining.
-//
-// FAIL FAST: Performs validation at binding time to ensure proper configuration.
+// FAIL FAST: Performs comprehensive validation at binding time.
 //
 // Example:
 //
 //	// Register multiple plugins
-//	BindMulti[Plugin](injector).To(PluginA{})
-//	BindMulti[Plugin](injector).To(PluginB{})
+//	BindMulti[Plugin, *PluginA](injector)
+//	BindMulti[Plugin, *PluginB](injector)
+//	BindMulti[Plugin, *PluginC](injector, WithAnnotation("optional"))
 //
 //	// Inject as slice
 //	type Service struct {
@@ -25,39 +24,7 @@ import (
 //
 //	// Or retrieve programmatically
 //	plugins, _ := GetInstance[[]Plugin](injector)
-func BindMulti[T any](injector *Injector) *Binding {
-	if injector == nil {
-		panic("cannot create multi-binding on nil injector")
-	}
-
-	bindtype := reflect.TypeOf((*T)(nil)).Elem()
-
-	// FAIL FAST: Validate that we're not binding nil
-	if bindtype == nil {
-		panic("cannot create multi-binding for nil type")
-	}
-
-	binding := &Binding{
-		typeof: bindtype,
-	}
-
-	// Add to injector's multi-bindings
-	imb := injector.multibindings[bindtype]
-	imb = append(imb, binding)
-	injector.multibindings[bindtype] = imb
-
-	return binding
-}
-
-// BindMultiTo creates a type-safe multi-binding from interface F to concrete type T.
-// This validates at binding time that T is assignable to F.
-//
-// FAIL FAST: Runtime validation of assignability at binding time.
-//
-// Example:
-//
-//	BindMultiTo[Plugin, *PluginImpl](injector).AnnotatedWith("production")
-func BindMultiTo[F, T any](injector *Injector) *Binding {
+func BindMulti[F, T any](injector *Injector, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot create multi-binding on nil injector")
 	}
@@ -93,6 +60,11 @@ func BindMultiTo[F, T any](injector *Injector) *Binding {
 		to:     actualToType,
 	}
 
+	// Apply functional options
+	for _, opt := range opts {
+		opt(binding)
+	}
+
 	// Add to injector's multi-bindings
 	imb := injector.multibindings[fromType]
 	imb = append(imb, binding)
@@ -109,7 +81,10 @@ func BindMultiTo[F, T any](injector *Injector) *Binding {
 //
 //	plugin := &MyPlugin{configured: true}
 //	BindMultiInstance[Plugin](injector, plugin)
-func BindMultiInstance[T any](injector *Injector, instance T) *Binding {
+//
+//	logger := &FileLogger{path: "/var/log/app.log"}
+//	BindMultiInstance[Logger](injector, logger, WithAnnotation("production"))
+func BindMultiInstance[T any](injector *Injector, instance T, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot create multi-binding on nil injector")
 	}
@@ -143,6 +118,11 @@ func BindMultiInstance[T any](injector *Injector, instance T) *Binding {
 		},
 	}
 
+	// Apply functional options
+	for _, opt := range opts {
+		opt(binding)
+	}
+
 	// Add to injector's multi-bindings
 	imb := injector.multibindings[bindtype]
 	imb = append(imb, binding)
@@ -161,7 +141,7 @@ func BindMultiInstance[T any](injector *Injector, instance T) *Binding {
 //	BindMultiProvider[Plugin](injector, func() Plugin {
 //	    return &DynamicPlugin{timestamp: time.Now()}
 //	})
-func BindMultiProvider[T any](injector *Injector, provider func() T) *Binding {
+func BindMultiProvider[T any](injector *Injector, provider func() T, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot create multi-binding on nil injector")
 	}
@@ -169,7 +149,7 @@ func BindMultiProvider[T any](injector *Injector, provider func() T) *Binding {
 		panic("cannot bind multi-binding to nil provider")
 	}
 
-	return BindMultiProviderFunc[T](injector, provider)
+	return BindMultiProviderFunc[T](injector, provider, opts...)
 }
 
 // BindMultiProviderWithError creates a multi-binding to a provider that can return errors.
@@ -179,7 +159,7 @@ func BindMultiProvider[T any](injector *Injector, provider func() T) *Binding {
 //	BindMultiProviderWithError[Plugin](injector, func() (Plugin, error) {
 //	    return loadPlugin()
 //	})
-func BindMultiProviderWithError[T any](injector *Injector, provider func() (T, error)) *Binding {
+func BindMultiProviderWithError[T any](injector *Injector, provider func() (T, error), opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot create multi-binding on nil injector")
 	}
@@ -187,7 +167,7 @@ func BindMultiProviderWithError[T any](injector *Injector, provider func() (T, e
 		panic("cannot bind multi-binding to nil provider")
 	}
 
-	return BindMultiProviderFunc[T](injector, provider)
+	return BindMultiProviderFunc[T](injector, provider, opts...)
 }
 
 // BindMultiProviderFunc creates a multi-binding to a provider function with automatic dependency injection.
@@ -200,7 +180,11 @@ func BindMultiProviderWithError[T any](injector *Injector, provider func() (T, e
 //	BindMultiProviderFunc[Handler](injector, func(logger Logger) Handler {
 //	    return &LoggingHandler{logger: logger}
 //	})
-func BindMultiProviderFunc[T any](injector *Injector, providerFunc interface{}) *Binding {
+//
+//	BindMultiProviderFunc[Middleware](injector, func(auth Auth) Middleware {
+//	    return &AuthMiddleware{auth: auth}
+//	}, WithAnnotation("security"))
+func BindMultiProviderFunc[T any](injector *Injector, providerFunc interface{}, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot create multi-binding on nil injector")
 	}
@@ -268,6 +252,11 @@ func BindMultiProviderFunc[T any](injector *Injector, providerFunc interface{}) 
 		},
 	}
 	binding.provider.binding = binding
+
+	// Apply functional options
+	for _, opt := range opts {
+		opt(binding)
+	}
 
 	// Add to injector's multi-bindings
 	imb := injector.multibindings[bindtype]

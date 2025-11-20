@@ -5,19 +5,18 @@ import (
 	"reflect"
 )
 
-// BindMap creates a new type-safe map-binding for type T with the specified key.
+// BindMap creates a type-safe map-binding from interface/type F to concrete type T with a specified key.
 // Map-bindings allow multiple implementations to be registered with string keys
 // and injected as a map[string]T or individually by key.
 //
-// Returns *Binding for compatibility with the existing API, allowing method chaining.
-//
-// FAIL FAST: Performs validation at binding time to ensure proper configuration.
+// FAIL FAST: Performs comprehensive validation at binding time.
 //
 // Example:
 //
 //	// Register multiple storage backends
-//	BindMap[Storage](injector, "redis").To(RedisStorage{})
-//	BindMap[Storage](injector, "postgres").To(PostgresStorage{})
+//	BindMap[Storage, *RedisStorage](injector, "redis")
+//	BindMap[Storage, *PostgresStorage](injector, "postgres")
+//	BindMap[Storage, *S3Storage](injector, "s3", WithAnnotation("cloud"))
 //
 //	// Inject as map
 //	type Service struct {
@@ -28,49 +27,7 @@ import (
 //	type RedisService struct {
 //	    Storage Storage `inject:"map:redis"`
 //	}
-func BindMap[T any](injector *Injector, key string) *Binding {
-	if injector == nil {
-		panic("cannot create map-binding on nil injector")
-	}
-
-	// FAIL FAST: Validate key is not empty
-	if key == "" {
-		panic("map-binding validation failed: key cannot be empty string")
-	}
-
-	bindtype := reflect.TypeOf((*T)(nil)).Elem()
-
-	// FAIL FAST: Validate that we're not binding nil
-	if bindtype == nil {
-		panic("cannot create map-binding for nil type")
-	}
-
-	binding := &Binding{
-		typeof: bindtype,
-	}
-
-	// Initialize map if needed
-	bindingMap := injector.mapbindings[bindtype]
-	if bindingMap == nil {
-		bindingMap = make(map[string]*Binding)
-	}
-
-	// Store the binding with the key
-	bindingMap[key] = binding
-	injector.mapbindings[bindtype] = bindingMap
-
-	return binding
-}
-
-// BindMapTo creates a type-safe map-binding from interface F to concrete type T.
-// This validates at binding time that T is assignable to F.
-//
-// FAIL FAST: Runtime validation of assignability at binding time.
-//
-// Example:
-//
-//	BindMapTo[Cache, *RedisCache](injector, "redis").In(Singleton)
-func BindMapTo[F, T any](injector *Injector, key string) *Binding {
+func BindMap[F, T any](injector *Injector, key string, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot create map-binding on nil injector")
 	}
@@ -112,6 +69,11 @@ func BindMapTo[F, T any](injector *Injector, key string) *Binding {
 		to:     actualToType,
 	}
 
+	// Apply functional options
+	for _, opt := range opts {
+		opt(binding)
+	}
+
 	// Initialize map if needed
 	bindingMap := injector.mapbindings[fromType]
 	if bindingMap == nil {
@@ -132,8 +94,11 @@ func BindMapTo[F, T any](injector *Injector, key string) *Binding {
 // Example:
 //
 //	cache := &RedisCache{configured: true}
-//	BindMapInstance[Cache](injector, "redis", cache).In(Singleton)
-func BindMapInstance[T any](injector *Injector, key string, instance T) *Binding {
+//	BindMapInstance[Cache](injector, "redis", cache)
+//
+//	db := &PostgresDB{connectionString: "localhost"}
+//	BindMapInstance[Database](injector, "primary", db, AsSingleton())
+func BindMapInstance[T any](injector *Injector, key string, instance T, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot create map-binding on nil injector")
 	}
@@ -173,6 +138,11 @@ func BindMapInstance[T any](injector *Injector, key string, instance T) *Binding
 		},
 	}
 
+	// Apply functional options
+	for _, opt := range opts {
+		opt(binding)
+	}
+
 	// Initialize map if needed
 	bindingMap := injector.mapbindings[bindtype]
 	if bindingMap == nil {
@@ -196,7 +166,7 @@ func BindMapInstance[T any](injector *Injector, key string, instance T) *Binding
 //	BindMapProvider[Connection](injector, "pool1", func() Connection {
 //	    return createConnection("pool1")
 //	})
-func BindMapProvider[T any](injector *Injector, key string, provider func() T) *Binding {
+func BindMapProvider[T any](injector *Injector, key string, provider func() T, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot create map-binding on nil injector")
 	}
@@ -210,7 +180,7 @@ func BindMapProvider[T any](injector *Injector, key string, provider func() T) *
 		panic(fmt.Sprintf("cannot bind map-binding (key=%q) to nil provider", key))
 	}
 
-	return BindMapProviderFunc[T](injector, key, provider)
+	return BindMapProviderFunc[T](injector, key, provider, opts...)
 }
 
 // BindMapProviderWithError creates a map-binding to a provider that can return errors.
@@ -220,7 +190,7 @@ func BindMapProvider[T any](injector *Injector, key string, provider func() T) *
 //	BindMapProviderWithError[Client](injector, "api", func() (Client, error) {
 //	    return createAPIClient()
 //	})
-func BindMapProviderWithError[T any](injector *Injector, key string, provider func() (T, error)) *Binding {
+func BindMapProviderWithError[T any](injector *Injector, key string, provider func() (T, error), opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot create map-binding on nil injector")
 	}
@@ -234,7 +204,7 @@ func BindMapProviderWithError[T any](injector *Injector, key string, provider fu
 		panic(fmt.Sprintf("cannot bind map-binding (key=%q) to nil provider", key))
 	}
 
-	return BindMapProviderFunc[T](injector, key, provider)
+	return BindMapProviderFunc[T](injector, key, provider, opts...)
 }
 
 // BindMapProviderFunc creates a map-binding to a provider function with automatic dependency injection.
@@ -247,7 +217,11 @@ func BindMapProviderWithError[T any](injector *Injector, key string, provider fu
 //	BindMapProviderFunc[Repository](injector, "users", func(db Database) Repository {
 //	    return &UserRepository{db: db}
 //	})
-func BindMapProviderFunc[T any](injector *Injector, key string, providerFunc interface{}) *Binding {
+//
+//	BindMapProviderFunc[Cache](injector, "session", func(redis Redis) Cache {
+//	    return &SessionCache{redis: redis}
+//	}, WithAnnotation("production"), AsSingleton())
+func BindMapProviderFunc[T any](injector *Injector, key string, providerFunc interface{}, opts ...BindingOption) *Binding {
 	if injector == nil {
 		panic("cannot create map-binding on nil injector")
 	}
@@ -328,6 +302,11 @@ func BindMapProviderFunc[T any](injector *Injector, key string, providerFunc int
 		},
 	}
 	binding.provider.binding = binding
+
+	// Apply functional options
+	for _, opt := range opts {
+		opt(binding)
+	}
 
 	// Initialize map if needed
 	bindingMap := injector.mapbindings[bindtype]
