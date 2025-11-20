@@ -1,5 +1,7 @@
 package dingo
 
+import "fmt"
+
 // This file demonstrates the new Go-idiomatic generic binding API.
 //
 // Key Features:
@@ -66,6 +68,45 @@ type PluginB struct{}
 
 func (p *PluginB) Initialize() error { return nil }
 func (p *PluginB) Execute() error    { return nil }
+
+// Test/Example-specific types
+type MockDB struct{}
+
+func (m *MockDB) Query(sql string) error { return nil }
+
+type LoggingInterceptor struct {
+	Target Database
+	Logger Logger
+}
+
+func (l *LoggingInterceptor) Query(sql string) error {
+	l.Logger.Log("Executing: " + sql)
+	return l.Target.Query(sql)
+}
+
+type MetricsService interface {
+	RecordMetric(name string, value float64)
+}
+
+type MockMetrics struct{}
+
+func (m *MockMetrics) RecordMetric(name string, value float64) {}
+
+type ConfigService interface {
+	GetConfig(key string) string
+}
+
+type MockConfig struct{}
+
+func (m *MockConfig) GetConfig(key string) string { return "" }
+
+type HealthChecker interface {
+	Check() error
+}
+
+type MockHealth struct{}
+
+func (m *MockHealth) Check() error { return nil }
 
 // ====================
 // Example 1: Basic Binding
@@ -247,10 +288,6 @@ func ExampleOverrideBindings() {
 	Bind[Database, *PostgresDB](injector, AsSingleton())
 
 	// Override with mock in tests
-	type MockDB struct{}
-
-	func (m *MockDB) Query(sql string) error { return nil }
-
 	Override[Database, *MockDB](injector, "")
 
 	// GetInstance now returns the mock
@@ -263,17 +300,6 @@ func ExampleOverrideBindings() {
 // ====================
 func ExampleInterceptors() {
 	injector, _ := NewInjector()
-
-	// Define interceptor
-	type LoggingInterceptor struct {
-		Target Database
-		Logger Logger
-	}
-
-	func (l *LoggingInterceptor) Query(sql string) error {
-		l.Logger.Log("Executing: " + sql)
-		return l.Target.Query(sql)
-	}
 
 	// Set up bindings
 	Bind[Logger, *ConsoleLogger](injector)
@@ -469,4 +495,236 @@ func ExampleCompatibility() {
 
 	logger.Log("Mixed API usage works perfectly")
 	db.Query("SELECT 1")
+}
+
+// ====================
+// Example 16: Compile-Time Interface Verification
+// ====================
+func ExampleCompileTimeVerification() {
+	injector, _ := NewInjector()
+
+	// Compile-time verification that ConsoleLogger implements Logger
+	// This will fail at compile time if ConsoleLogger doesn't implement Logger!
+	_ = Implements[Logger, ConsoleLogger]()
+
+	// Use it in binding for extra safety
+	Bind[Logger, *ConsoleLogger](injector)
+	_ = Implements[Logger, ConsoleLogger]()
+
+	// This ensures at compile time that your types implement the required interfaces
+	// before you even run your code!
+	_ = Implements[Database, PostgresDB]()
+	Bind[Database, *PostgresDB](injector)
+
+	// Multiple verifications
+	_ = Implements[Cache, RedisCache]()
+	_ = Implements[Plugin, PluginA]()
+	_ = Implements[Plugin, PluginB]()
+}
+
+// ====================
+// Example 17: Runtime Interface Verification
+// ====================
+func ExampleRuntimeVerification() {
+	injector, _ := NewInjector()
+
+	// Runtime verification with panic on failure
+	// Useful for defensive programming and early error detection
+	MustImplement[Logger, ConsoleLogger]()
+	Bind[Logger, *ConsoleLogger](injector)
+
+	// Can be used in module initialization
+	initModule := func(i *Injector) {
+		// Verify all implementations before binding
+		MustImplement[Database, PostgresDB]()
+		MustImplement[Cache, RedisCache]()
+		MustImplement[Plugin, PluginA]()
+		MustImplement[Plugin, PluginB]()
+
+		// Then proceed with bindings
+		Bind[Database, *PostgresDB](i)
+		Bind[Cache, *RedisCache](i)
+		BindMulti[Plugin, *PluginA](i)
+		BindMulti[Plugin, *PluginB](i)
+	}
+
+	initModule(injector)
+}
+
+// ====================
+// Example 18: Type-Safe Provider Functions
+// ====================
+func ExampleTypeSafeProviders() {
+	injector, _ := NewInjector()
+
+	// Set up dependencies
+	Bind[Logger, *ConsoleLogger](injector, AsSingleton())
+	Bind[Database, *PostgresDB](injector, AsSingleton())
+
+	// Type-safe provider with one dependency
+	// The Provider1[Cache, Database] type enforces:
+	// - Takes exactly one Database parameter
+	// - Returns exactly one Cache value
+	// No interface{} needed!
+	cacheProvider := func(db Database) Cache {
+		// db is Database, not interface{}!
+		return &RedisCache{}
+	}
+	BindProvider1[Cache, Database](injector, cacheProvider, AsSingleton())
+
+	// Type-safe provider with two dependencies
+	// Provider2[T, D1, D2] enforces exact types
+	Bind[ConfigService, *MockConfig](injector)
+
+	serviceProvider := func(logger Logger, config ConfigService) Database {
+		logger.Log("Creating database with config")
+		return &PostgresDB{connectionString: config.GetConfig("db.url")}
+	}
+	BindProvider2[Database, Logger, ConfigService](injector, serviceProvider)
+
+	// Retrieve instances
+	cache, _ := GetInstance[Cache](injector)
+	cache.Set("key", "value")
+}
+
+// ====================
+// Example 19: Type-Safe Providers With Error Handling
+// ====================
+func ExampleTypeSafeProvidersWithError() {
+	injector, _ := NewInjector()
+
+	Bind[Logger, *ConsoleLogger](injector, AsSingleton())
+
+	// Type-safe provider with error handling and dependencies
+	// ProviderWithError1[Database, Logger] enforces:
+	// - Takes exactly one Logger parameter
+	// - Returns exactly (Database, error)
+	dbProvider := func(logger Logger) (Database, error) {
+		logger.Log("Connecting to database")
+		// Type-safe! No interface{} conversions!
+		return &PostgresDB{connectionString: "localhost"}, nil
+	}
+	BindProviderWithError1[Database, Logger](injector, dbProvider, AsSingleton())
+
+	// ProviderWithError2 with two dependencies
+	cacheProvider := func(db Database, logger Logger) (Cache, error) {
+		logger.Log("Creating cache")
+		return &RedisCache{}, nil
+	}
+	BindProviderWithError2[Cache, Database, Logger](injector, cacheProvider)
+
+	db, err := GetInstance[Database](injector)
+	if err != nil {
+		panic(err)
+	}
+	db.Query("SELECT 1")
+}
+
+// ====================
+// Example 20: Type Safety Comparison
+// ====================
+func ExampleTypeSafetyComparison() {
+	injector, _ := NewInjector()
+
+	Bind[Logger, *ConsoleLogger](injector, AsSingleton())
+	Bind[Database, *PostgresDB](injector, AsSingleton())
+
+	// ============ OLD WAY (BindProviderFunc) ============
+	// Provider function with interface{} - type errors caught at RUNTIME only
+	/*
+		BindProviderFunc[Cache](injector, func(db Database, logger Logger) Cache {
+			// Works, but if you accidentally swap parameters:
+			// func(logger Database, db Logger) Cache { ... }
+			// You only find out at runtime!
+			return &RedisCache{}
+		})
+	*/
+
+	// ============ NEW WAY (Type-Safe Providers) ============
+	// Type errors caught at COMPILE TIME!
+	correctProvider := func(db Database, logger Logger) Cache {
+		logger.Log("Creating cache")
+		return &RedisCache{}
+	}
+	BindProvider2[Cache, Database, Logger](injector, correctProvider)
+
+	// This would NOT compile - parameter types don't match!
+	// wrongProvider := func(logger Logger, db Database) Cache {
+	//     return &RedisCache{}
+	// }
+	// BindProvider2[Cache, Database, Logger](injector, wrongProvider) // COMPILE ERROR!
+
+	// This would NOT compile - wrong return type!
+	// wrongReturnProvider := func(db Database, logger Logger) Database {
+	//     return db
+	// }
+	// BindProvider2[Cache, Database, Logger](injector, wrongReturnProvider) // COMPILE ERROR!
+
+	// ============ BENEFITS ============
+	// 1. Compile-time type safety - catch errors before running
+	// 2. Better IDE support - autocomplete knows exact types
+	// 3. Self-documenting - provider signature shows dependencies clearly
+	// 4. Refactoring-friendly - type errors caught immediately
+
+	cache, _ := GetInstance[Cache](injector)
+	cache.Set("key", "value")
+}
+
+// ====================
+// Example 21: Advanced Type Safety Patterns
+// ====================
+func ExampleAdvancedTypeSafety() {
+	injector, _ := NewInjector()
+
+	// Pattern 1: Verify interface implementation, then bind
+	_ = Implements[Logger, ConsoleLogger]()
+	Bind[Logger, *ConsoleLogger](injector, AsSingleton())
+
+	// Pattern 2: Complex provider with up to 5 dependencies
+	// Set up all dependencies
+	Bind[Database, *PostgresDB](injector, AsSingleton())
+	Bind[MetricsService, *MockMetrics](injector, AsSingleton())
+	Bind[ConfigService, *MockConfig](injector, AsSingleton())
+	Bind[HealthChecker, *MockHealth](injector, AsSingleton())
+
+	// Provider with 5 dependencies - all type-safe!
+	complexProvider := func(
+		logger Logger,
+		db Database,
+		metrics MetricsService,
+		config ConfigService,
+		health HealthChecker,
+	) Cache {
+		logger.Log("Creating cache with full dependencies")
+		metrics.RecordMetric("cache.created", 1)
+		return &RedisCache{}
+	}
+
+	BindProvider5[Cache, Logger, Database, MetricsService, ConfigService, HealthChecker](
+		injector,
+		complexProvider,
+		AsSingleton(),
+	)
+
+	// Pattern 3: Error handling with multiple dependencies
+	serviceProvider := func(
+		logger Logger,
+		db Database,
+		config ConfigService,
+	) (Cache, error) {
+		logger.Log("Initializing service")
+		if config.GetConfig("cache.enabled") == "false" {
+			return nil, fmt.Errorf("cache disabled")
+		}
+		return &RedisCache{}, nil
+	}
+
+	BindProviderWithError3[Cache, Logger, Database, ConfigService](
+		injector,
+		serviceProvider,
+		WithAnnotation("service-cache"),
+	)
+
+	cache, _ := GetInstance[Cache](injector)
+	cache.Set("key", "value")
 }

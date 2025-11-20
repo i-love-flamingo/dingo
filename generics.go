@@ -22,6 +22,109 @@ import (
 )
 
 // ============================================================================
+// Type-Safe Provider Function Types
+// ============================================================================
+
+// Provider0 is a type-safe provider function with no dependencies that returns T.
+// Using this instead of interface{} provides compile-time type safety.
+type Provider0[T any] func() T
+
+// Provider1 is a type-safe provider function with 1 dependency.
+type Provider1[T, D1 any] func(D1) T
+
+// Provider2 is a type-safe provider function with 2 dependencies.
+type Provider2[T, D1, D2 any] func(D1, D2) T
+
+// Provider3 is a type-safe provider function with 3 dependencies.
+type Provider3[T, D1, D2, D3 any] func(D1, D2, D3) T
+
+// Provider4 is a type-safe provider function with 4 dependencies.
+type Provider4[T, D1, D2, D3, D4 any] func(D1, D2, D3, D4) T
+
+// Provider5 is a type-safe provider function with 5 dependencies.
+type Provider5[T, D1, D2, D3, D4, D5 any] func(D1, D2, D3, D4, D5) T
+
+// ProviderWithError0 is a type-safe provider that returns T and error, with no dependencies.
+type ProviderWithError0[T any] func() (T, error)
+
+// ProviderWithError1 is a type-safe provider that returns T and error, with 1 dependency.
+type ProviderWithError1[T, D1 any] func(D1) (T, error)
+
+// ProviderWithError2 is a type-safe provider that returns T and error, with 2 dependencies.
+type ProviderWithError2[T, D1, D2 any] func(D1, D2) (T, error)
+
+// ProviderWithError3 is a type-safe provider that returns T and error, with 3 dependencies.
+type ProviderWithError3[T, D1, D2, D3 any] func(D1, D2, D3) (T, error)
+
+// ProviderWithError4 is a type-safe provider that returns T and error, with 4 dependencies.
+type ProviderWithError4[T, D1, D2, D3, D4 any] func(D1, D2, D3, D4) (T, error)
+
+// ProviderWithError5 is a type-safe provider that returns T and error, with 5 dependencies.
+type ProviderWithError5[T, D1, D2, D3, D4, D5 any] func(D1, D2, D3, D4, D5) (T, error)
+
+// ============================================================================
+// Type Constraints and Verification
+// ============================================================================
+
+// Implements is a runtime verification helper that T implements I.
+// This uses reflection to verify interface implementation and panics if not satisfied.
+//
+// Note: For true compile-time verification, use the traditional Go pattern:
+//
+//	var _ MyInterface = (*MyType)(nil)
+//
+// Example:
+//
+//	type MyImpl struct{}
+//	func (m *MyImpl) DoSomething() {}
+//
+//	// Verify implementation (panics if not satisfied)
+//	_ = Implements[MyInterface, MyImpl]()
+func Implements[I, T any]() struct{} {
+	// Verify at runtime using reflection
+	var t T
+	var i *I
+	tType := reflect.TypeOf(t)
+	iType := reflect.TypeOf(i).Elem()
+
+	if tType != nil && iType != nil {
+		if !tType.Implements(iType) && !reflect.PtrTo(tType).Implements(iType) {
+			panic(fmt.Sprintf(
+				"type verification failed: %s does not implement %s",
+				tType, iType,
+			))
+		}
+	}
+
+	return struct{}{}
+}
+
+// MustImplement is a runtime verification that T implements I, with a clear panic message.
+// Use this in init() functions or at binding time for additional safety.
+//
+// Example:
+//
+//	func init() {
+//	    MustImplement[MyInterface, *MyImpl]()
+//	}
+func MustImplement[I, T any]() {
+	var t T
+	tType := reflect.TypeOf(t)
+	iType := reflect.TypeOf((*I)(nil)).Elem()
+
+	if tType == nil || iType == nil {
+		panic(fmt.Sprintf("MustImplement: cannot verify nil types"))
+	}
+
+	if !tType.Implements(iType) && !reflect.PtrTo(tType).Implements(iType) {
+		panic(fmt.Sprintf(
+			"type safety violation: %s does not implement %s",
+			tType, iType,
+		))
+	}
+}
+
+// ============================================================================
 // Functional Options
 // ============================================================================
 
@@ -359,6 +462,82 @@ func BindProviderFunc[T any](injector *Injector, providerFunc interface{}, opts 
 	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)
 
 	return binding
+}
+
+// ============================================================================
+// Type-Safe Provider Binding Functions
+// ============================================================================
+// These functions use the Provider* and ProviderWithError* types for compile-time
+// type safety, eliminating the need for interface{} and runtime reflection validation
+// of provider signatures.
+
+// BindProvider1 creates a binding using a type-safe provider with 1 dependency.
+// This provides compile-time type safety for the provider signature.
+//
+// Example:
+//
+//	BindProvider1(injector, func(db Database) Cache {
+//	    return &RedisCache{db: db}
+//	}, AsSingleton())
+func BindProvider1[T, D1 any](injector *Injector, provider Provider1[T, D1], opts ...BindingOption) *Binding {
+	return BindProviderFunc[T](injector, provider, opts...)
+}
+
+// BindProvider2 creates a binding using a type-safe provider with 2 dependencies.
+//
+// Example:
+//
+//	BindProvider2(injector, func(db Database, logger Logger) Cache {
+//	    return &RedisCache{db: db, logger: logger}
+//	}, AsSingleton())
+func BindProvider2[T, D1, D2 any](injector *Injector, provider Provider2[T, D1, D2], opts ...BindingOption) *Binding {
+	return BindProviderFunc[T](injector, provider, opts...)
+}
+
+// BindProvider3 creates a binding using a type-safe provider with 3 dependencies.
+func BindProvider3[T, D1, D2, D3 any](injector *Injector, provider Provider3[T, D1, D2, D3], opts ...BindingOption) *Binding {
+	return BindProviderFunc[T](injector, provider, opts...)
+}
+
+// BindProvider4 creates a binding using a type-safe provider with 4 dependencies.
+func BindProvider4[T, D1, D2, D3, D4 any](injector *Injector, provider Provider4[T, D1, D2, D3, D4], opts ...BindingOption) *Binding {
+	return BindProviderFunc[T](injector, provider, opts...)
+}
+
+// BindProvider5 creates a binding using a type-safe provider with 5 dependencies.
+func BindProvider5[T, D1, D2, D3, D4, D5 any](injector *Injector, provider Provider5[T, D1, D2, D3, D4, D5], opts ...BindingOption) *Binding {
+	return BindProviderFunc[T](injector, provider, opts...)
+}
+
+// BindProviderWithError1 creates a binding using a type-safe provider with 1 dependency that can return an error.
+//
+// Example:
+//
+//	BindProviderWithError1(injector, func(config Config) (Database, error) {
+//	    return connectDB(config)
+//	}, AsSingleton())
+func BindProviderWithError1[T, D1 any](injector *Injector, provider ProviderWithError1[T, D1], opts ...BindingOption) *Binding {
+	return BindProviderFunc[T](injector, provider, opts...)
+}
+
+// BindProviderWithError2 creates a binding using a type-safe provider with 2 dependencies that can return an error.
+func BindProviderWithError2[T, D1, D2 any](injector *Injector, provider ProviderWithError2[T, D1, D2], opts ...BindingOption) *Binding {
+	return BindProviderFunc[T](injector, provider, opts...)
+}
+
+// BindProviderWithError3 creates a binding using a type-safe provider with 3 dependencies that can return an error.
+func BindProviderWithError3[T, D1, D2, D3 any](injector *Injector, provider ProviderWithError3[T, D1, D2, D3], opts ...BindingOption) *Binding {
+	return BindProviderFunc[T](injector, provider, opts...)
+}
+
+// BindProviderWithError4 creates a binding using a type-safe provider with 4 dependencies that can return an error.
+func BindProviderWithError4[T, D1, D2, D3, D4 any](injector *Injector, provider ProviderWithError4[T, D1, D2, D3, D4], opts ...BindingOption) *Binding {
+	return BindProviderFunc[T](injector, provider, opts...)
+}
+
+// BindProviderWithError5 creates a binding using a type-safe provider with 5 dependencies that can return an error.
+func BindProviderWithError5[T, D1, D2, D3, D4, D5 any](injector *Injector, provider ProviderWithError5[T, D1, D2, D3, D4, D5], opts ...BindingOption) *Binding {
+	return BindProviderFunc[T](injector, provider, opts...)
 }
 
 // ============================================================================
