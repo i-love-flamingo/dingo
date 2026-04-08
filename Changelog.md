@@ -1,5 +1,17 @@
 # Changelog
 
+## Version v0.3.1 (2026-04-08)
+
+### Chores and tidying
+
+- **deps:** update dependency golangci/golangci-lint to v2.11.4 (#81) (13109058)
+- **deps:** update golangci/golangci-lint-action action to v9 (#78) (4a45a95c)
+- **deps:** update actions/checkout action to v6 (#79) (80475650)
+- **deps:** update actions/setup-go action to v6 (#77) (3be3c87d)
+- **deps:** update module github.com/stretchr/testify to v1.11.1 (#76) (edade43e)
+- migrate golangci-lint to v2 (#74) (e7b57e90)
+- update to go 1.23 and adjust linter rules (#70) (bc12e054)
+
 ## Version v0.3.0 (2024-11-27)
 
 ### Features
