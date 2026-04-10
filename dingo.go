@@ -16,8 +16,9 @@ const (
 )
 
 var (
+	ErrInitModules           = errors.New("initialization of modules failed")
 	ErrInvalidInjectReceiver = errors.New("usage of 'Inject' method with struct receiver is not allowed")
-	errPointersToInterface   = errors.New(" Do not use pointers to interface.")
+	errPointersToInterface   = errors.New(" Do not use pointers to interface")
 
 	traceCircular    []circularTraceEntry
 	injectionTracing = false
@@ -46,7 +47,7 @@ type (
 		scopes               map[reflect.Type]Scope               // scope-bindings
 		stage                uint                                 // current stage
 		delayed              []interface{}                        // delayed bindings
-		buildEagerSingletons bool                                 // weather to build singletons
+		buildEagerSingletons bool                                 // whether to build singletons
 	}
 
 	// overrides are evaluated lazy, so they are scheduled here
@@ -107,7 +108,18 @@ func (injector *Injector) Child() (*Injector, error) {
 func (injector *Injector) InitModules(modules ...Module) error {
 	injector.stage = INIT
 
-	modules = resolveDependencies(modules, nil)
+	mg := newModuleGraph()
+
+	err := mg.Add(modules...)
+	if err != nil {
+		return fmt.Errorf("%w: failed adding modules to the graph: %w", ErrInitModules, err)
+	}
+
+	modules, err = mg.Sort()
+	if err != nil {
+		return fmt.Errorf("%w: failed sorting modules: %w", ErrInitModules, err)
+	}
+
 	for _, module := range modules {
 		if err := injector.requestInjection(module, traceCircular); err != nil {
 			erroredModule := reflect.TypeOf(module).Elem()
