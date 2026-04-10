@@ -116,7 +116,12 @@ func (mg *modGraph) Sort() ([]Module, error) {
 		return modules, nil
 	}
 
-	if cycles, ok := errors.AsType[topo.Unorderable](err); ok && len(cycles) > 0 {
+	//TODO: uncomment once go1.27 is released (errors.AsType is available only since go1.26)
+	// if cycles, ok := errors.AsType[topo.Unorderable](err); ok && len(cycles) > 0 {
+
+	var cycles topo.Unorderable
+
+	if errors.As(err, &cycles) && len(cycles) > 0 {
 		var names []string
 
 		for _, cycle := range cycles {
