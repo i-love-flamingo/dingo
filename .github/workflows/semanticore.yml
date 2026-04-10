@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [ '1.*' ]
+        go: [ '1.26' ]
     name: Semanticore
     steps:
       - uses: actions/checkout@v6

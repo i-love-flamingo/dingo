@@ -83,6 +83,7 @@ type (
 func TestScopeWithSubDependencies(t *testing.T) {
 	sc := singletonC("singleton C")
 	scp := &sc
+
 	for i := 0; i < 10; i++ {
 		t.Run(fmt.Sprintf("Run %d", i), func(t *testing.T) {
 			injector, err := NewInjector()
