@@ -58,21 +58,27 @@ func goroutineID() string {
 // isCreating checks if the given goroutine is currently creating the given identifier.
 func (s *SingletonScope) isCreating(ident identifier, gid string) bool {
 	if val, ok := s.creating.Load(ident); ok {
-		_, ok := val.(*sync.Map).Load(gid); return ok
+		inner, ok := val.(*sync.Map) //nolint:forcetypeassert // creating always stores *sync.Map values
+		_, loaded := inner.Load(gid)
+
+		return loaded && ok
 	}
+
 	return false
 }
 
 // markCreating marks the given goroutine as creating the given identifier.
 func (s *SingletonScope) markCreating(ident identifier, gid string) {
 	val, _ := s.creating.LoadOrStore(ident, &sync.Map{})
-	val.(*sync.Map).Store(gid, true)
+	inner, _ := val.(*sync.Map) //nolint:forcetypeassert // creating always stores *sync.Map values
+	inner.Store(gid, true)
 }
 
 // unmarkCreating removes the mark. Cleans up the inner map if empty.
 func (s *SingletonScope) unmarkCreating(ident identifier, gid string) {
 	if val, ok := s.creating.Load(ident); ok {
-		val.(*sync.Map).Delete(gid)
+		inner, _ := val.(*sync.Map) //nolint:forcetypeassert // creating always stores *sync.Map values
+		inner.Delete(gid)
 	}
 }
 

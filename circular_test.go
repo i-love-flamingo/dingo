@@ -83,6 +83,8 @@ type (
 )
 
 func TestCircularSingletonBinding(t *testing.T) {
+	t.Parallel()
+
 	EnableCircularTracing()
 	defer func() {
 		traceCircular = nil
@@ -99,8 +101,9 @@ func TestCircularSingletonBinding(t *testing.T) {
 	}, "should panic on circular singleton dependency")
 }
 
-
 func TestConcurrentSingletonResolution(t *testing.T) {
+	t.Parallel()
+
 	injector, err := NewInjector()
 	assert.NoError(t, err)
 
@@ -108,6 +111,7 @@ func TestConcurrentSingletonResolution(t *testing.T) {
 
 	// Resolve the same singleton concurrently from multiple goroutines
 	errCh := make(chan error, 20)
+
 	for i := 0; i < 20; i++ {
 		go func() {
 			_, err := injector.GetInstance(new(testSingleton))
@@ -117,6 +121,7 @@ func TestConcurrentSingletonResolution(t *testing.T) {
 
 	for i := 0; i < 20; i++ {
 		err := <-errCh
+
 		assert.NoError(t, err)
 	}
 }
