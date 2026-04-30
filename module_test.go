@@ -90,8 +90,8 @@ func Test_resolveDependencies(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []Module{
-		new(resolveDependenciesModuleB2),
 		new(resolveDependenciesModuleC),
+		new(resolveDependenciesModuleB2),
 		new(resolveDependenciesModuleB),
 		new(resolveDependenciesModuleA),
 	}, resolved)

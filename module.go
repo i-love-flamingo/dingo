@@ -46,11 +46,12 @@ type modGraph struct {
 	*simple.DirectedGraph
 	idMap map[int64]Module // node ID → Module
 	index map[string]int64 // moduleIdentity → node ID
+	order map[int64]int    // node ID → registration order (loop index from Add)
 }
 
 var typeOfModuleFunc = reflect.TypeOf(ModuleFunc(nil))
 
-// Configure call the original ModuleFunc with the given *Injector.
+// Configure calls the original ModuleFunc with the given *Injector.
 func (f ModuleFunc) Configure(injector *Injector) {
 	f(injector)
 }
@@ -81,6 +82,7 @@ func newModuleGraph() *modGraph {
 		DirectedGraph: simple.NewDirectedGraph(),
 		idMap:         make(map[int64]Module),
 		index:         make(map[string]int64),
+		order:         make(map[int64]int),
 	}
 
 	return mg
@@ -90,8 +92,8 @@ func newModuleGraph() *modGraph {
 // A module that is already present (identified by its type or by a pointer
 // for ModuleFunc) is skipped — only the first instance is kept.
 func (mg *modGraph) Add(modules ...Module) error {
-	for _, module := range modules {
-		_, err := mg.addModule(module)
+	for i, module := range modules {
+		_, err := mg.addModule(i, module)
 		if err != nil {
 			return err
 		}
@@ -101,11 +103,13 @@ func (mg *modGraph) Add(modules ...Module) error {
 }
 
 // Sort returns all modules in topological order: every dependency appears
-// before the modules that depend on it. Module identity
-// breaks ties between independent modules alphabetically, so the result is stable.
+// before the modules that depend on it. Ties between independent modules
+// are broken by registration order (the loop index from Add), so the result
+// preserves the original module insertion order whenever the topological
+// constraints allow it.
 // An error is returned if the graph contains a cycle.
 func (mg *modGraph) Sort() ([]Module, error) {
-	sorted, err := topo.SortStabilized(mg, mg.orderByName)
+	sorted, err := topo.SortStabilized(mg, mg.orderByInsertion)
 	if err == nil {
 		modules := make([]Module, len(sorted))
 
@@ -138,22 +142,34 @@ func (mg *modGraph) Sort() ([]Module, error) {
 	return nil, ErrModuleSort
 }
 
-// orderByName is the tiebreaker passed to topo.SortStabilized.
-// It sorts a batch of topologically equivalent nodes alphabetically
-// by module identity so that Sort produces a deterministic result.
-func (mg *modGraph) orderByName(nodes []graph.Node) {
+// orderByInsertion is the tiebreaker passed to topo.SortStabilized.
+// It sorts a batch of topologically equivalent nodes primarily by their
+// registration order (the loop index recorded when each module was first
+// added to the graph) so that Sort preserves the original module insertion
+// order for modules that are not connected by a dependency edge.
+// Node ID (assigned monotonically as nodes are created) is used as a
+// secondary key so that ties within an equal-order group — typically
+// transitive dependencies pulled in by the same top-level module — are
+// resolved in the order they were created, yielding a deterministic result.
+func (mg *modGraph) orderByInsertion(nodes []graph.Node) {
 	slices.SortStableFunc(nodes, func(a, b graph.Node) int {
-		m1 := mg.idMap[a.ID()]
-		m2 := mg.idMap[b.ID()]
+		if d := mg.order[a.ID()] - mg.order[b.ID()]; d != 0 {
+			return d
+		}
 
-		return strings.Compare(moduleIdentity(m1), moduleIdentity(m2))
+		return int(a.ID() - b.ID())
 	})
 }
 
 // addModule inserts a single module into the graph (if not already present)
 // and recursively inserts all modules returned by its Depends method.
+// The order parameter is the registration index of the top-level module that
+// pulled this module in (its position in the slice passed to Add); transitive
+// dependencies inherit the parent's order so that they cluster together with
+// their dependent in the tiebreaker. Modules that are already present keep
+// the order from their first registration.
 // It returns the graph node ID assigned to the module.
-func (mg *modGraph) addModule(module Module) (int64, error) {
+func (mg *modGraph) addModule(order int, module Module) (int64, error) {
 	key := moduleIdentity(module)
 
 	processed, ok := mg.index[key]
@@ -164,11 +180,12 @@ func (mg *modGraph) addModule(module Module) (int64, error) {
 	newNode := mg.NewNode()
 	mg.index[key] = newNode.ID()
 	mg.idMap[newNode.ID()] = module
+	mg.order[newNode.ID()] = order
 	mg.AddNode(newNode)
 
 	if depender, ok := module.(Depender); ok {
 		for _, dep := range depender.Depends() {
-			depID, err := mg.addModule(dep)
+			depID, err := mg.addModule(order, dep)
 			if err != nil {
 				return 0, fmt.Errorf("could not add module: %w", err)
 			}
