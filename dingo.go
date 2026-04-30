@@ -666,13 +666,16 @@ func (injector *Injector) Bind(what interface{}) *Binding {
 	if what == nil {
 		panic("Cannot bind nil")
 	}
+
 	bindtype := reflect.TypeOf(what)
 	if bindtype.Kind() == reflect.Ptr {
 		bindtype = bindtype.Elem()
 	}
+
 	binding := new(Binding)
 	binding.typeof = bindtype
 	injector.bindings[bindtype] = append(injector.bindings[bindtype], binding)
+
 	return binding
 }
 

@@ -1,6 +1,7 @@
 package dingo
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 )
@@ -33,6 +34,8 @@ type (
 	}
 )
 
+var ErrIncorrectBinding = errors.New("incorrect binding")
+
 // To binds a concrete type to a binding
 func (b *Binding) To(what interface{}) *Binding {
 	to := reflect.TypeOf(what)
@@ -41,7 +44,7 @@ func (b *Binding) To(what interface{}) *Binding {
 		to = to.Elem()
 	}
 
-	if !to.AssignableTo(b.typeof) && !reflect.PtrTo(to).AssignableTo(b.typeof) {
+	if !to.AssignableTo(b.typeof) && !reflect.PointerTo(to).AssignableTo(b.typeof) {
 		panic(fmt.Sprintf("%s#%s not assignable to %s#%s", to.PkgPath(), to.Name(), b.typeof.PkgPath(), b.typeof.Name()))
 	}
 
@@ -56,7 +59,7 @@ func (b *Binding) ToInstance(instance interface{}) *Binding {
 		itype:  reflect.TypeOf(instance),
 		ivalue: reflect.ValueOf(instance),
 	}
-	if !b.instance.itype.AssignableTo(b.typeof) && !b.instance.itype.AssignableTo(reflect.PtrTo(b.typeof)) {
+	if !b.instance.itype.AssignableTo(b.typeof) && !b.instance.itype.AssignableTo(reflect.PointerTo(b.typeof)) {
 		panic(fmt.Sprintf("%s#%s not assignable to %s#%s", b.instance.itype.PkgPath(), b.instance.itype.Name(), b.typeof.PkgPath(), b.typeof.Name()))
 	}
 	return b
@@ -64,16 +67,28 @@ func (b *Binding) ToInstance(instance interface{}) *Binding {
 
 // ToProvider binds a provider to an instance. The provider's arguments are automatically injected
 func (b *Binding) ToProvider(p interface{}) *Binding {
-	provider := &Provider{
-		fnc:     reflect.ValueOf(p),
-		binding: b,
+	err := bindToProvider(b, p)
+	if err != nil {
+		panic(err)
 	}
-	provider.fnctype = provider.fnc.Type().Out(0)
-	if !provider.fnctype.AssignableTo(b.typeof) && !provider.fnctype.AssignableTo(reflect.PtrTo(b.typeof)) {
-		panic(fmt.Sprintf("provider returns %q which is not assignable to %q", provider.fnctype, b.typeof))
-	}
-	b.provider = provider
+
 	return b
+}
+
+func bindToProvider(binding *Binding, providerFunc any) error {
+	provider := &Provider{
+		fnc:     reflect.ValueOf(providerFunc),
+		binding: binding,
+	}
+
+	provider.fnctype = provider.fnc.Type().Out(0)
+	if !provider.fnctype.AssignableTo(binding.typeof) && !provider.fnctype.AssignableTo(reflect.PointerTo(binding.typeof)) {
+		return fmt.Errorf("%w: provider returns %q which is not assignable to %q", ErrIncorrectBinding, provider.fnctype, binding.typeof)
+	}
+
+	binding.provider = provider
+
+	return nil
 }
 
 // AnnotatedWith sets the binding's annotation
