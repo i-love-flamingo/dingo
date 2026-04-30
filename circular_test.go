@@ -72,3 +72,51 @@ func TestDingoCircula(t *testing.T) {
 		d.A()
 	})
 }
+
+type (
+	circSingletonA struct {
+		B *circSingletonB `inject:""`
+	}
+	circSingletonB struct {
+		A *circSingletonA `inject:""`
+	}
+)
+
+func TestCircularSingletonBinding(t *testing.T) {
+	EnableCircularTracing()
+	defer func() {
+		traceCircular = nil
+	}()
+
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+
+	injector.Bind(new(circSingletonA)).In(Singleton)
+	injector.Bind(new(circSingletonB)).In(Singleton)
+
+	assert.Panics(t, func() {
+		injector.GetInstance(new(circSingletonA))
+	}, "should panic on circular singleton dependency")
+}
+
+
+func TestConcurrentSingletonResolution(t *testing.T) {
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+
+	injector.Bind(new(testSingleton)).In(Singleton)
+
+	// Resolve the same singleton concurrently from multiple goroutines
+	errCh := make(chan error, 20)
+	for i := 0; i < 20; i++ {
+		go func() {
+			_, err := injector.GetInstance(new(testSingleton))
+			errCh <- err
+		}()
+	}
+
+	for i := 0; i < 20; i++ {
+		err := <-errCh
+		assert.NoError(t, err)
+	}
+}
