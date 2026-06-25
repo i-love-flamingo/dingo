@@ -16,7 +16,7 @@ jobs:
         go: [ '1.25', '1.*' ]
     name: Tests
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
@@ -32,7 +32,7 @@ jobs:
         go: [ '1.*' ]
     name: Coverage Report
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
@@ -62,7 +62,7 @@ jobs:
         go: [ '1.*' ]
     name: Static checks
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
