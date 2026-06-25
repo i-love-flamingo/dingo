@@ -200,10 +200,11 @@ func (mg *modGraph) addModule(order int, module Module) (int64, error) {
 	return newNode.ID(), nil
 }
 
-// moduleIdentity returns a stable string key that uniquely identifies a module.
-// For ordinary module types the key is the fully qualified type name.
-// For ModuleFunc values the function pointer address is included so that
-// two distinct func literals are treated as different modules.
+// moduleIdentity returns a stable key uniquely identifying a module. Ordinary
+// modules are keyed by their import-path-qualified type name; the full path
+// (not reflect.Type.String, which uses only the short package name) is needed
+// so same-named types from different packages don't collide. ModuleFunc values
+// are keyed by their function pointer so distinct literals stay distinct.
 func moduleIdentity(module Module) string {
 	modType := reflect.TypeOf(module)
 	if modType == typeOfModuleFunc {
@@ -211,5 +212,20 @@ func moduleIdentity(module Module) string {
 		return fmt.Sprintf("%s_%d", value.Type(), value.Pointer())
 	}
 
-	return modType.String()
+	return qualifiedTypeName(modType)
+}
+
+// qualifiedTypeName is like reflect.Type.String but uses the full import path
+// instead of the short package name, preserving pointer markers. Unnamed types
+// (no import path) fall back to String.
+func qualifiedTypeName(t reflect.Type) string {
+	if t.Kind() == reflect.Pointer {
+		return "*" + qualifiedTypeName(t.Elem())
+	}
+
+	if t.PkgPath() == "" {
+		return t.String()
+	}
+
+	return t.PkgPath() + "." + t.Name()
 }

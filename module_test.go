@@ -180,7 +180,7 @@ func TestModGraph_Sorted(t *testing.T) {
 			modules: []Module{&A{withCycle: true}, new(B), new(D), new(E)},
 			assertErr: assert.ErrorAssertionFunc(func(t assert.TestingT, err error, i ...interface{}) bool {
 				return assert.ErrorIs(t, err, ErrModuleCycle) &&
-					assert.ErrorContains(t, err, "cyclic module dependency: *dingo.A → *dingo.C → *dingo.E")
+					assert.ErrorContains(t, err, "cyclic module dependency: *flamingo.me/dingo.A → *flamingo.me/dingo.C → *flamingo.me/dingo.E")
 			}),
 		},
 	}
