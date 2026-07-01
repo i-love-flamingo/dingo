@@ -55,6 +55,18 @@ Skip-string convention:
   into a successful-looking nil/zero value, which can propagate corrupt state further
   into the application undetected).
 
+### 3. Singleton scope hides resolution errors on the cached path
+- **What's wrong:** After a failed resolve, `SingletonScope.ResolveType` still stores the
+  (invalid) value, and its RLock fast-path returns that value to any later caller for the same
+  `(type, annotation)` with a **nil** error. Only the first caller sees the real error.
+- **Location:** `scope.go:56-64` (fast-path `return instance.(reflect.Value), nil`) and
+  `scope.go:71-76` (stores the instance even when `unscoped` returned an error).
+- **Reproducing test:** `TestSingletonDoesNotHideResolutionError` in `scope_extra_test.go` (t.Skip).
+- **Observed:** second caller receives `nil` error despite the first resolve failing.
+  **Expected:** the resolve error should reach every caller (or nothing cached on error).
+  **Severity:** high — a failed dependency construction is silently masked for all but the first
+  requester, and a cached invalid `reflect.Value` may be served.
+
 ## Intentionally not covered (a choice, not an oversight)
 
 - logging toggles `EnableInjectionTracing` / `EnableCircularTracing`
