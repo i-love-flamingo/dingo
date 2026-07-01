@@ -30,6 +30,31 @@ Skip-string convention:
   panic — as opposed to a returned error — can crash a calling process instead of
   letting it handle initialization failure gracefully).
 
+### 2. `ToProvider` binding silently drops the provider's error return
+- **What's wrong:** When a binding is created with `Bind(...).ToProvider(fn)` where
+  `fn` has signature `func(...) (T, error)`, and that binding is resolved through the
+  normal `getInstance`/field-injection path (as opposed to a multibinding/mapbinding
+  `...Provider`-suffixed slice/map field), the error return of `fn` is never inspected.
+  `Provider.Create` calls `p.fnc.Call(in)[0]` — hardcoding index `0` — and returns
+  `injector.requestInjection(res, traceCircular)` as the error, completely discarding
+  whatever `fn` returned as its second value. A provider that deliberately returns
+  `(nil, someErr)` therefore resolves successfully with a nil/zero value instead of
+  surfacing `someErr`.
+- **Location:** `binding.go:103-116` (`Provider.Create`), specifically
+  `res := p.fnc.Call(in)[0]` at `binding.go:114`, which only reads the first return
+  value. Contrast with `dingo.go:470-502` (`createProviderForBinding`), which
+  correctly threads a `canError` flag and reflects the second return value out via
+  `reflectedError` — but that code path is only used for multibindings/mapbindings of
+  providers, not for a plain `ToProvider` binding consumed via `GetInstance` or an
+  injected `...Provider`-suffixed field backed by that binding.
+- **Reproducing test:** `TestProviderErrorPropagates` in `injector_resolution_test.go`
+  (currently `t.Skip`).
+- **Observed:** `got.(*holder).P()` returns `(nil, nil)` — the error is swallowed.
+  **Expected:** `got.(*holder).P()` returns `(nil, boom)`, surfacing the provider's
+  error to the caller. **Severity:** medium-high (silently converts a provider failure
+  into a successful-looking nil/zero value, which can propagate corrupt state further
+  into the application undetected).
+
 ## Intentionally not covered (a choice, not an oversight)
 
 - logging toggles `EnableInjectionTracing` / `EnableCircularTracing`
