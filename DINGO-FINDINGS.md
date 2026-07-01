@@ -81,3 +81,32 @@ Template:
 - **Reproducing test:** `TestName` in `<file>` (currently t.Skip)
 - **Observed:** … **Expected:** … **Severity:** high|medium|low
 -->
+
+## Summary
+
+| # | Title | Severity | Reproducing test (t.Skip) |
+|---|-------|----------|---------------------------|
+| 1 | Self-dependent module panics (gonum self-edge) instead of returning `ErrModuleCycle` | medium | `TestSelfDependencyIsRejected` (module_loading_test.go) |
+| 2 | `ToProvider(func() (T, error))` silently drops the error return | medium | `TestProviderErrorPropagates` (injector_resolution_test.go) |
+| 3 | `SingletonScope` returns a cached value with nil error after a failed resolve | high | `TestSingletonDoesNotHideResolutionError` (scope_extra_test.go) |
+
+All three are documented, not fixed (tests-only effort). Each reproducing test is `t.Skip`ped and will start failing (prompting a fix) once the underlying bug is addressed.
+
+## Low-severity observations (noted, no test)
+
+- Overriding a never-bound type does not error: `Override()` calls `Bind()` internally, so the
+  `cannot override unknown binding` branch in `InitModules` is effectively unreachable via the
+  public API. Not harmful.
+- An interceptor that embeds an **unexported** interface panics with a cryptic reflect
+  `mustBeAssignable` error (reflection cannot set unexported fields). Interceptors must embed
+  the exported interface. Reasonable limitation; cryptic message.
+- `dingo`'s `Singleton` scope is process-global, keyed by `(type, annotation)` and shared across
+  injectors — two independent injectors share a singleton instance of the same type. By design
+  (`ChildSingleton` is the per-injector variant), but a footgun worth knowing.
+
+## Deferred (out of scope for this tests-only effort)
+
+- **CI guardrails**: add a coverage floor and a longer randomized run (higher iteration count of
+  `TestRandomModuleOrdering`) to CI so ordering regressions and coverage drops fail the build.
+- **Low-coverage-by-choice**: logging toggles `EnableInjectionTracing`/`EnableCircularTracing`
+  and the `errUnbound.Error` string formatter are intentionally untested.
