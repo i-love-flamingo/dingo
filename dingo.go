@@ -739,7 +739,18 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 						return wrapErr(err)
 					}
 				}
-				setup.Call(args)
+				err = func() (err error) {
+					defer func() {
+						if r := recover(); r != nil {
+							err = fmt.Errorf("panic in Inject: %v", r)
+						}
+					}()
+					setup.Call(args)
+					return nil
+				}()
+				if err != nil {
+					return wrapErr(err)
+				}
 			}
 			injectlist = append(injectlist, current.Elem())
 

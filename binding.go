@@ -64,8 +64,16 @@ func (b *Binding) ToInstance(instance interface{}) *Binding {
 
 // ToProvider binds a provider to an instance. The provider's arguments are automatically injected
 func (b *Binding) ToProvider(p interface{}) *Binding {
+	fnc := reflect.ValueOf(p)
+	if fnc.Kind() != reflect.Func || fnc.Type().NumOut() < 1 || fnc.Type().NumOut() > 2 {
+		panic(fmt.Sprintf("ToProvider expects a function with 1 or 2 return values, but got %T", p))
+	}
+	if fnc.Type().NumOut() == 2 && !fnc.Type().Out(1).Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+		panic(fmt.Errorf("second return value of provider %T must be an error", p))
+	}
+
 	provider := &Provider{
-		fnc:     reflect.ValueOf(p),
+		fnc:     fnc,
 		binding: b,
 	}
 	provider.fnctype = provider.fnc.Type().Out(0)
@@ -111,6 +119,24 @@ func (p *Provider) Create(injector *Injector) (reflect.Value, error) {
 			in[i] = in[i].Elem()
 		}
 	}
-	res := p.fnc.Call(in)[0]
+
+	var res reflect.Value
+	err = func() (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("panic in provider: %v", r)
+			}
+		}()
+		results := p.fnc.Call(in)
+		res = results[0]
+		if len(results) == 2 && !results[1].IsNil() {
+			return results[1].Interface().(error)
+		}
+		return nil
+	}()
+	if err != nil {
+		return reflect.Value{}, err
+	}
+
 	return res, injector.requestInjection(res, traceCircular)
 }
