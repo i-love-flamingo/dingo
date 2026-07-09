@@ -22,6 +22,10 @@ func TestInitModules_DistinctPackagesSameTypeName(t *testing.T) {
 		t.Fatalf("InitModules: %v", err)
 	}
 
+	if _, err := injector.GetInstance((*commercecart.Service)(nil)); err != nil {
+		t.Fatalf("binding from the first same-named module was dropped: %v", err)
+	}
+
 	if _, err := injector.GetInstance((*om3cart.Service)(nil)); err != nil {
 		t.Fatalf("binding from the second same-named module was dropped: %v", err)
 	}
