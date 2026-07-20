@@ -1,6 +1,7 @@
 package dingo
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -196,6 +197,59 @@ func TestModGraph_Sorted(t *testing.T) {
 			if test.assertErr(t, err) {
 				assert.Equalf(t, test.sorted, sorted, "Sorted()")
 			}
+		})
+	}
+}
+
+// namedSlice and namedPointer are named defined types whose underlying kind is
+// a composite. qualifiedTypeName must key them by their own package path and
+// name rather than unwrapping to the structural form, otherwise two distinct
+// named wrapper types over the same element would collide.
+type (
+	namedSlice   []int
+	namedPointer *int
+)
+
+func TestQualifiedTypeName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		typ  reflect.Type
+		want string
+	}{
+		{
+			name: "pointer to named struct is qualified through element",
+			typ:  reflect.TypeOf(&A{}),
+			want: "*flamingo.me/dingo.A",
+		},
+		{
+			name: "named slice keeps its own identity",
+			typ:  reflect.TypeOf(namedSlice(nil)),
+			want: "flamingo.me/dingo.namedSlice",
+		},
+		{
+			name: "named pointer keeps its own identity",
+			typ:  reflect.TypeOf(namedPointer(nil)),
+			want: "flamingo.me/dingo.namedPointer",
+		},
+		{
+			name: "anonymous slice of named type is qualified through element",
+			typ:  reflect.TypeOf([]A{}),
+			want: "[]flamingo.me/dingo.A",
+		},
+		{
+			name: "builtin type falls back to String",
+			typ:  reflect.TypeOf(0),
+			want: "int",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, test.want, qualifiedTypeName(test.typ))
 		})
 	}
 }

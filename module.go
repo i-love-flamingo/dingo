@@ -217,10 +217,17 @@ func moduleIdentity(module Module) string {
 // qualifiedTypeName returns a globally unique name for the given type by
 // combining its package import path with its type name. This distinguishes
 // identically named types declared in different packages, which
-// reflect.Type.String() (e.g. "*oauth.Module") does not. Pointer, slice,
-// array, map and channel wrappers are preserved so their element types are
-// qualified recursively.
+// reflect.Type.String() (e.g. "*oauth.Module") does not. Named defined types
+// are qualified by their own package path and name, so a named type whose
+// underlying kind is a composite (e.g. type Modules []Module) keeps its own
+// identity. Anonymous composite types (pointer, slice, array, map, channel)
+// have no package path; their element types are qualified recursively so that
+// e.g. a bare *oauth.Module resolves through the named element.
 func qualifiedTypeName(t reflect.Type) string {
+	if pkgPath := t.PkgPath(); pkgPath != "" {
+		return pkgPath + "." + t.Name()
+	}
+
 	switch t.Kind() {
 	case reflect.Pointer:
 		return "*" + qualifiedTypeName(t.Elem())
@@ -232,10 +239,6 @@ func qualifiedTypeName(t reflect.Type) string {
 		return "map[" + qualifiedTypeName(t.Key()) + "]" + qualifiedTypeName(t.Elem())
 	case reflect.Chan:
 		return t.ChanDir().String() + " " + qualifiedTypeName(t.Elem())
-	}
-
-	if pkgPath := t.PkgPath(); pkgPath != "" {
-		return pkgPath + "." + t.Name()
 	}
 
 	return t.String()
