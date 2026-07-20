@@ -211,5 +211,32 @@ func moduleIdentity(module Module) string {
 		return fmt.Sprintf("%s_%d", value.Type(), value.Pointer())
 	}
 
-	return modType.String()
+	return qualifiedTypeName(modType)
+}
+
+// qualifiedTypeName returns a globally unique name for the given type by
+// combining its package import path with its type name. This distinguishes
+// identically named types declared in different packages, which
+// reflect.Type.String() (e.g. "*oauth.Module") does not. Pointer, slice,
+// array, map and channel wrappers are preserved so their element types are
+// qualified recursively.
+func qualifiedTypeName(t reflect.Type) string {
+	switch t.Kind() {
+	case reflect.Pointer:
+		return "*" + qualifiedTypeName(t.Elem())
+	case reflect.Slice:
+		return "[]" + qualifiedTypeName(t.Elem())
+	case reflect.Array:
+		return fmt.Sprintf("[%d]%s", t.Len(), qualifiedTypeName(t.Elem()))
+	case reflect.Map:
+		return "map[" + qualifiedTypeName(t.Key()) + "]" + qualifiedTypeName(t.Elem())
+	case reflect.Chan:
+		return t.ChanDir().String() + " " + qualifiedTypeName(t.Elem())
+	}
+
+	if pkgPath := t.PkgPath(); pkgPath != "" {
+		return pkgPath + "." + t.Name()
+	}
+
+	return t.String()
 }
