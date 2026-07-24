@@ -223,23 +223,23 @@ func moduleIdentity(module Module) string {
 // identity. Anonymous composite types (pointer, slice, array, map, channel)
 // have no package path; their element types are qualified recursively so that
 // e.g. a bare *oauth.Module resolves through the named element.
-func qualifiedTypeName(t reflect.Type) string {
-	if pkgPath := t.PkgPath(); pkgPath != "" {
-		return pkgPath + "." + t.Name()
+func qualifiedTypeName(typ reflect.Type) string {
+	if pkgPath := typ.PkgPath(); pkgPath != "" {
+		return pkgPath + "." + typ.Name()
 	}
 
-	switch t.Kind() {
+	switch typ.Kind() { //nolint:exhaustive // default branch handles all remaining kinds
 	case reflect.Pointer:
-		return "*" + qualifiedTypeName(t.Elem())
+		return "*" + qualifiedTypeName(typ.Elem())
 	case reflect.Slice:
-		return "[]" + qualifiedTypeName(t.Elem())
+		return "[]" + qualifiedTypeName(typ.Elem())
 	case reflect.Array:
-		return fmt.Sprintf("[%d]%s", t.Len(), qualifiedTypeName(t.Elem()))
+		return fmt.Sprintf("[%d]%s", typ.Len(), qualifiedTypeName(typ.Elem()))
 	case reflect.Map:
-		return "map[" + qualifiedTypeName(t.Key()) + "]" + qualifiedTypeName(t.Elem())
+		return "map[" + qualifiedTypeName(typ.Key()) + "]" + qualifiedTypeName(typ.Elem())
 	case reflect.Chan:
-		return t.ChanDir().String() + " " + qualifiedTypeName(t.Elem())
+		return typ.ChanDir().String() + " " + qualifiedTypeName(typ.Elem())
+	default:
+		return typ.String()
 	}
-
-	return t.String()
 }

@@ -18,6 +18,8 @@ import (
 // that string silently dropped one of them, so its Configure never ran. Both
 // modules must be initialized.
 func TestNewInjector_SameShortNameDifferentPackages(t *testing.T) {
+	t.Parallel()
+
 	pkgone.Configured = 0
 	pkgtwo.Configured = 0
 
