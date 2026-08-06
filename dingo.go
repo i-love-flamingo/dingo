@@ -725,7 +725,7 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 
 		i++
 
-		if ctype.Kind() != reflect.Pointer && current.MethodByName("Inject").IsValid() {
+		if ctype.Kind() != reflect.Ptr && current.MethodByName("Inject").IsValid() {
 			return fmt.Errorf("invalid inject receiver %s: %w", current, ErrInvalidInjectReceiver)
 		}
 
@@ -778,7 +778,7 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 
 						field.Set(instance.Elem())
 					} else {
-						if field.Kind() == reflect.Pointer && field.Type().Kind() == reflect.Pointer && field.Type().Elem().Kind() == reflect.Interface {
+						if field.Kind() == reflect.Ptr && field.Type().Kind() == reflect.Ptr && field.Type().Elem().Kind() == reflect.Interface {
 							return wrapErr(fmt.Errorf("field %#v is pointer to interface. %w", currentFieldName, errPointersToInterface))
 						}
 
