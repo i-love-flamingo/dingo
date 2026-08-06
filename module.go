@@ -239,33 +239,35 @@ func moduleName(module Module) string {
 // any named element/key type inside them is also fully qualified. Anonymous
 // composite types (struct, interface, func) fall back to reflect.Type.String,
 // as does anything else not covered above.
-func qualifiedTypeName(t reflect.Type) string {
-	if t.PkgPath() != "" {
-		return t.PkgPath() + "." + t.Name()
+func qualifiedTypeName(typ reflect.Type) string {
+	if typ.PkgPath() != "" {
+		return typ.PkgPath() + "." + typ.Name()
 	}
 
-	switch t.Kind() {
+	//nolint:exhaustive // only kinds that can wrap a named type are qualified, everything else falls back to reflect.Type.String
+	switch typ.Kind() {
 	case reflect.Pointer:
-		return "*" + qualifiedTypeName(t.Elem())
+		return "*" + qualifiedTypeName(typ.Elem())
 	case reflect.Slice:
-		return "[]" + qualifiedTypeName(t.Elem())
+		return "[]" + qualifiedTypeName(typ.Elem())
 	case reflect.Array:
-		return fmt.Sprintf("[%d]%s", t.Len(), qualifiedTypeName(t.Elem()))
+		return fmt.Sprintf("[%d]%s", typ.Len(), qualifiedTypeName(typ.Elem()))
 	case reflect.Map:
-		return "map[" + qualifiedTypeName(t.Key()) + "]" + qualifiedTypeName(t.Elem())
+		return "map[" + qualifiedTypeName(typ.Key()) + "]" + qualifiedTypeName(typ.Elem())
 	case reflect.Chan:
 		var prefix string
-		switch t.ChanDir() {
+
+		switch typ.ChanDir() {
 		case reflect.RecvDir:
 			prefix = "<-chan "
 		case reflect.SendDir:
 			prefix = "chan<- "
-		default:
+		case reflect.BothDir:
 			prefix = "chan "
 		}
 
-		return prefix + qualifiedTypeName(t.Elem())
+		return prefix + qualifiedTypeName(typ.Elem())
 	}
 
-	return t.String()
+	return typ.String()
 }
