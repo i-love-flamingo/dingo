@@ -10,8 +10,14 @@ type serviceImpl struct{}
 
 func (serviceImpl) Marker() {}
 
-type Module struct{}
+type Module struct {
+	OnConfigure func()
+}
 
-func (*Module) Configure(injector *dingo.Injector) {
+func (module *Module) Configure(injector *dingo.Injector) {
+	if module.OnConfigure != nil {
+		module.OnConfigure()
+	}
+
 	injector.Bind((*Service)(nil)).To(serviceImpl{})
 }

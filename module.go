@@ -45,8 +45,13 @@ var (
 type modGraph struct {
 	*simple.DirectedGraph
 	idMap map[int64]Module // node ID → Module
-	index map[string]int64 // moduleIdentity → node ID
-	order map[int64]int    // node ID → registration order (loop index from Add)
+	index map[moduleKey]int64
+	order map[int64]int // node ID → registration order (loop index from Add)
+}
+
+type moduleKey struct {
+	typ      reflect.Type
+	function uintptr
 }
 
 var typeOfModuleFunc = reflect.TypeOf(ModuleFunc(nil))
@@ -81,7 +86,7 @@ func newModuleGraph() *modGraph {
 	mg := &modGraph{
 		DirectedGraph: simple.NewDirectedGraph(),
 		idMap:         make(map[int64]Module),
-		index:         make(map[string]int64),
+		index:         make(map[moduleKey]int64),
 		order:         make(map[int64]int),
 	}
 
@@ -131,7 +136,7 @@ func (mg *modGraph) Sort() ([]Module, error) {
 		for _, cycle := range cycles {
 			for _, node := range cycle {
 				if m, found := mg.idMap[node.ID()]; found {
-					names = append(names, moduleIdentity(m))
+					names = append(names, moduleName(m))
 				}
 			}
 
@@ -200,32 +205,43 @@ func (mg *modGraph) addModule(order int, module Module) (int64, error) {
 	return newNode.ID(), nil
 }
 
-// moduleIdentity returns a stable key uniquely identifying a module. Ordinary
-// modules are keyed by their import-path-qualified type name; the full path
-// (not reflect.Type.String, which uses only the short package name) is needed
-// so same-named types from different packages don't collide. ModuleFunc values
-// are keyed by their function pointer so distinct literals stay distinct.
-func moduleIdentity(module Module) string {
+// moduleIdentity returns a comparable key that uniquely identifies a module.
+// Ordinary modules are keyed by reflect.Type, which preserves exact type
+// identity without relying on a potentially ambiguous string representation.
+// ModuleFunc values also include their function pointer so distinct literals
+// remain distinct.
+func moduleIdentity(module Module) moduleKey {
 	modType := reflect.TypeOf(module)
+	key := moduleKey{typ: modType}
+
 	if modType == typeOfModuleFunc {
-		value := reflect.ValueOf(module)
-		return fmt.Sprintf("%s_%d", value.Type(), value.Pointer())
+		key.function = reflect.ValueOf(module).Pointer()
 	}
 
-	return qualifiedTypeName(modType)
+	return key
+}
+
+// moduleName returns the display name used in module graph diagnostics.
+func moduleName(module Module) string {
+	key := moduleIdentity(module)
+	if key.typ == typeOfModuleFunc {
+		return fmt.Sprintf("%s_%d", key.typ, key.function)
+	}
+
+	return qualifiedTypeName(key.typ)
 }
 
 // qualifiedTypeName is like reflect.Type.String but uses the full import path
 // instead of the short package name, preserving pointer markers. Unnamed types
 // (no import path) fall back to String.
 func qualifiedTypeName(t reflect.Type) string {
+	if t.PkgPath() != "" {
+		return t.PkgPath() + "." + t.Name()
+	}
+
 	if t.Kind() == reflect.Pointer {
 		return "*" + qualifiedTypeName(t.Elem())
 	}
 
-	if t.PkgPath() == "" {
-		return t.String()
-	}
-
-	return t.PkgPath() + "." + t.Name()
+	return t.String()
 }

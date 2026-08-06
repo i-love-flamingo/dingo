@@ -1,6 +1,7 @@
 package dingo
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -196,6 +197,50 @@ func TestModGraph_Sorted(t *testing.T) {
 			if test.assertErr(t, err) {
 				assert.Equalf(t, test.sorted, sorted, "Sorted()")
 			}
+		})
+	}
+}
+
+type (
+	namedSlice   []int
+	namedPointer *int
+)
+
+func TestQualifiedTypeName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		typ  reflect.Type
+		want string
+	}{
+		{
+			name: "pointer to named struct",
+			typ:  reflect.TypeOf(&A{}),
+			want: "*flamingo.me/dingo.A",
+		},
+		{
+			name: "named slice",
+			typ:  reflect.TypeOf(namedSlice(nil)),
+			want: "flamingo.me/dingo.namedSlice",
+		},
+		{
+			name: "named pointer",
+			typ:  reflect.TypeOf(namedPointer(nil)),
+			want: "flamingo.me/dingo.namedPointer",
+		},
+		{
+			name: "builtin",
+			typ:  reflect.TypeOf(0),
+			want: "int",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, test.want, qualifiedTypeName(test.typ))
 		})
 	}
 }
