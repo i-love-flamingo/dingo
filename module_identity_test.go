@@ -7,15 +7,15 @@ import (
 
 	commercecart "flamingo.me/dingo/testdata/moduleidentity/commerce/cart"
 	om3cart "flamingo.me/dingo/testdata/moduleidentity/om3/cart"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInitModules_DistinctPackagesSameTypeName(t *testing.T) {
 	t.Parallel()
 
 	injector, err := dingo.NewInjector()
-	if err != nil {
-		t.Fatalf("NewInjector: %v", err)
-	}
+	require.NoError(t, err)
 
 	commerceConfigured := 0
 	om3Configured := 0
@@ -31,34 +31,22 @@ func TestInitModules_DistinctPackagesSameTypeName(t *testing.T) {
 	}
 
 	// Both packages expose a cart.Module; both must be configured, not collapsed.
-	if err := injector.InitModules(commerceModule, commerceModule, om3Module, om3Module); err != nil {
-		t.Fatalf("InitModules: %v", err)
-	}
+	require.NoError(t, injector.InitModules(commerceModule, commerceModule, om3Module, om3Module))
+	assert.Equal(t, 1, commerceConfigured)
+	assert.Equal(t, 1, om3Configured)
 
-	if commerceConfigured != 1 {
-		t.Fatalf("first same-named module configured %d times, want 1", commerceConfigured)
-	}
+	_, err = injector.GetInstance((*commercecart.Service)(nil))
+	require.NoError(t, err)
 
-	if om3Configured != 1 {
-		t.Fatalf("second same-named module configured %d times, want 1", om3Configured)
-	}
-
-	if _, err := injector.GetInstance((*commercecart.Service)(nil)); err != nil {
-		t.Fatalf("binding from the first same-named module was dropped: %v", err)
-	}
-
-	if _, err := injector.GetInstance((*om3cart.Service)(nil)); err != nil {
-		t.Fatalf("binding from the second same-named module was dropped: %v", err)
-	}
+	_, err = injector.GetInstance((*om3cart.Service)(nil))
+	require.NoError(t, err)
 }
 
 func TestInitModules_DistinctAnonymousModulesSameEmbeddedTypeName(t *testing.T) {
 	t.Parallel()
 
 	injector, err := dingo.NewInjector()
-	if err != nil {
-		t.Fatalf("NewInjector: %v", err)
-	}
+	require.NoError(t, err)
 
 	commerceModule := &struct{ *commercecart.Module }{
 		Module: new(commercecart.Module),
@@ -67,15 +55,11 @@ func TestInitModules_DistinctAnonymousModulesSameEmbeddedTypeName(t *testing.T) 
 		Module: new(om3cart.Module),
 	}
 
-	if err := injector.InitModules(commerceModule, om3Module); err != nil {
-		t.Fatalf("InitModules: %v", err)
-	}
+	require.NoError(t, injector.InitModules(commerceModule, om3Module))
 
-	if _, err := injector.GetInstance((*commercecart.Service)(nil)); err != nil {
-		t.Fatalf("binding from the first anonymous module was dropped: %v", err)
-	}
+	_, err = injector.GetInstance((*commercecart.Service)(nil))
+	require.NoError(t, err)
 
-	if _, err := injector.GetInstance((*om3cart.Service)(nil)); err != nil {
-		t.Fatalf("binding from the second anonymous module was dropped: %v", err)
-	}
+	_, err = injector.GetInstance((*om3cart.Service)(nil))
+	require.NoError(t, err)
 }

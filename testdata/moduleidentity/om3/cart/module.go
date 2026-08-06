@@ -1,3 +1,4 @@
+// Intentionally identical to commerce/cart so Type.String() collides while reflect.Type does not.
 package cart
 
 import "flamingo.me/dingo"

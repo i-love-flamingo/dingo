@@ -44,9 +44,9 @@ var (
 // connected components with more than one node.
 type modGraph struct {
 	*simple.DirectedGraph
-	idMap map[int64]Module // node ID → Module
-	index map[moduleKey]int64
-	order map[int64]int // node ID → registration order (loop index from Add)
+	idMap map[int64]Module    // node ID → Module
+	index map[moduleKey]int64 // moduleKey → node ID
+	order map[int64]int       // node ID → registration order (loop index from Add)
 }
 
 type moduleKey struct {
@@ -175,7 +175,7 @@ func (mg *modGraph) orderByInsertion(nodes []graph.Node) {
 // the order from their first registration.
 // It returns the graph node ID assigned to the module.
 func (mg *modGraph) addModule(order int, module Module) (int64, error) {
-	key := moduleIdentity(module)
+	key := moduleKeyOf(module)
 
 	processed, ok := mg.index[key]
 	if ok {
@@ -205,12 +205,10 @@ func (mg *modGraph) addModule(order int, module Module) (int64, error) {
 	return newNode.ID(), nil
 }
 
-// moduleIdentity returns a comparable key that uniquely identifies a module.
-// Ordinary modules are keyed by reflect.Type, which preserves exact type
-// identity without relying on a potentially ambiguous string representation.
-// ModuleFunc values also include their function pointer so distinct literals
-// remain distinct.
-func moduleIdentity(module Module) moduleKey {
+// moduleKeyOf returns a comparable key that uniquely identifies a module.
+// Ordinary modules are keyed by reflect.Type. ModuleFunc values also include
+// their function pointer so distinct literals remain distinct.
+func moduleKeyOf(module Module) moduleKey {
 	modType := reflect.TypeOf(module)
 	key := moduleKey{typ: modType}
 
@@ -221,14 +219,17 @@ func moduleIdentity(module Module) moduleKey {
 	return key
 }
 
-// moduleName returns the display name used in module graph diagnostics.
-func moduleName(module Module) string {
-	key := moduleIdentity(module)
-	if key.typ == typeOfModuleFunc {
-		return fmt.Sprintf("%s_%d", key.typ, key.function)
+// name returns the display name used in module graph diagnostics.
+func (k moduleKey) name() string {
+	if k.typ == typeOfModuleFunc {
+		return fmt.Sprintf("%s_%d", k.typ, k.function)
 	}
 
-	return qualifiedTypeName(key.typ)
+	return qualifiedTypeName(k.typ)
+}
+
+func moduleName(module Module) string {
+	return moduleKeyOf(module).name()
 }
 
 // qualifiedTypeName is like reflect.Type.String but uses the full import path
