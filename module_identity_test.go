@@ -11,6 +11,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type moduleWithDependencies struct {
+	dependencies []dingo.Module
+}
+
+func (*moduleWithDependencies) Configure(*dingo.Injector) {}
+
+func (module *moduleWithDependencies) Depends() []dingo.Module {
+	return module.dependencies
+}
+
 func TestInitModules_DistinctPackagesSameTypeName(t *testing.T) {
 	t.Parallel()
 
@@ -40,6 +50,26 @@ func TestInitModules_DistinctPackagesSameTypeName(t *testing.T) {
 
 	_, err = injector.GetInstance((*om3cart.Service)(nil))
 	require.NoError(t, err)
+}
+
+func TestInitModules_DistinctPackagesSameTypeNameAsDependencies(t *testing.T) {
+	t.Parallel()
+
+	injector, err := dingo.NewInjector()
+	require.NoError(t, err)
+
+	commerceConfigured := 0
+	om3Configured := 0
+	root := &moduleWithDependencies{
+		dependencies: []dingo.Module{
+			&commercecart.Module{OnConfigure: func() { commerceConfigured++ }},
+			&om3cart.Module{OnConfigure: func() { om3Configured++ }},
+		},
+	}
+
+	require.NoError(t, injector.InitModules(root))
+	assert.Equal(t, 1, commerceConfigured)
+	assert.Equal(t, 1, om3Configured)
 }
 
 func TestInitModules_DistinctAnonymousModulesSameEmbeddedTypeName(t *testing.T) {

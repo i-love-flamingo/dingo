@@ -51,11 +51,10 @@ type modGraph struct {
 
 type moduleKey struct {
 	typ reflect.Type
-	// function identifies a ModuleFunc by the reflect.Value of the wrapped func.
-	// reflect.Value compares by the underlying func value, so closures created
-	// from the same func literal stay distinct — reflect.Value.Pointer would
-	// collapse them into their shared code pointer. It is nil for other modules.
-	function interface{}
+	// function preserves ModuleFunc value identity. Different closures can share
+	// a code pointer, so reflect.Value keeps them distinct as it did before the
+	// module graph was introduced. It is nil for other modules.
+	function any
 }
 
 var typeOfModuleFunc = reflect.TypeOf(ModuleFunc(nil))
@@ -98,7 +97,7 @@ func newModuleGraph() *modGraph {
 }
 
 // Add adds each module and its transitive dependencies to the graph.
-// A module that is already present (identified by its type or by a pointer
+// A module that is already present (identified by its type or function value
 // for ModuleFunc) is skipped — only the first instance is kept.
 func (mg *modGraph) Add(modules ...Module) error {
 	for i, module := range modules {
