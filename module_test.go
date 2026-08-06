@@ -220,6 +220,11 @@ func TestQualifiedTypeName(t *testing.T) {
 			want: "*flamingo.me/dingo.A",
 		},
 		{
+			name: "double pointer to named struct",
+			typ:  reflect.TypeOf((**A)(nil)),
+			want: "**flamingo.me/dingo.A",
+		},
+		{
 			name: "named slice",
 			typ:  reflect.TypeOf(namedSlice(nil)),
 			want: "flamingo.me/dingo.namedSlice",
@@ -233,6 +238,46 @@ func TestQualifiedTypeName(t *testing.T) {
 			name: "builtin",
 			typ:  reflect.TypeOf(0),
 			want: "int",
+		},
+		{
+			name: "unnamed slice of builtin",
+			typ:  reflect.TypeOf([]int(nil)),
+			want: "[]int",
+		},
+		{
+			name: "unnamed slice of pointer to named struct",
+			typ:  reflect.TypeOf([]*A(nil)),
+			want: "[]*flamingo.me/dingo.A",
+		},
+		{
+			name: "unnamed array of pointer to named struct",
+			typ:  reflect.TypeOf([3]*A{}),
+			want: "[3]*flamingo.me/dingo.A",
+		},
+		{
+			name: "unnamed map with pointer to named struct value",
+			typ:  reflect.TypeOf(map[string]*A(nil)),
+			want: "map[string]*flamingo.me/dingo.A",
+		},
+		{
+			name: "unnamed bidirectional channel of pointer to named struct",
+			typ:  reflect.TypeOf(make(chan *A)),
+			want: "chan *flamingo.me/dingo.A",
+		},
+		{
+			name: "unnamed send-only channel of pointer to named struct",
+			typ:  reflect.TypeOf(make(chan<- *A)),
+			want: "chan<- *flamingo.me/dingo.A",
+		},
+		{
+			name: "unnamed receive-only channel of pointer to named struct",
+			typ:  reflect.TypeOf(make(<-chan *A)),
+			want: "<-chan *flamingo.me/dingo.A",
+		},
+		{
+			name: "anonymous struct falls back to Type.String",
+			typ:  reflect.TypeOf(struct{ X int }{}),
+			want: reflect.TypeOf(struct{ X int }{}).String(),
 		},
 	}
 

@@ -222,26 +222,49 @@ func moduleKeyOf(module Module) moduleKey {
 // name returns the display name used in module graph diagnostics.
 func (k moduleKey) name() string {
 	if k.typ == typeOfModuleFunc {
-		return fmt.Sprintf("%s_%d", k.typ, k.function)
+		return fmt.Sprintf("%s_%d", qualifiedTypeName(k.typ), k.function)
 	}
 
 	return qualifiedTypeName(k.typ)
 }
 
+// moduleName returns the display name used in module graph diagnostics for the given module.
 func moduleName(module Module) string {
 	return moduleKeyOf(module).name()
 }
 
 // qualifiedTypeName is like reflect.Type.String but uses the full import path
-// instead of the short package name, preserving pointer markers. Unnamed types
-// (no import path) fall back to String.
+// instead of the short package name for named types. It handles common
+// composite types recursively (pointer, slice, array, map, channel) so that
+// any named element/key type inside them is also fully qualified. Anonymous
+// composite types (struct, interface, func) fall back to reflect.Type.String,
+// as does anything else not covered above.
 func qualifiedTypeName(t reflect.Type) string {
 	if t.PkgPath() != "" {
 		return t.PkgPath() + "." + t.Name()
 	}
 
-	if t.Kind() == reflect.Pointer {
+	switch t.Kind() {
+	case reflect.Pointer:
 		return "*" + qualifiedTypeName(t.Elem())
+	case reflect.Slice:
+		return "[]" + qualifiedTypeName(t.Elem())
+	case reflect.Array:
+		return fmt.Sprintf("[%d]%s", t.Len(), qualifiedTypeName(t.Elem()))
+	case reflect.Map:
+		return "map[" + qualifiedTypeName(t.Key()) + "]" + qualifiedTypeName(t.Elem())
+	case reflect.Chan:
+		var prefix string
+		switch t.ChanDir() {
+		case reflect.RecvDir:
+			prefix = "<-chan "
+		case reflect.SendDir:
+			prefix = "chan<- "
+		default:
+			prefix = "chan "
+		}
+
+		return prefix + qualifiedTypeName(t.Elem())
 	}
 
 	return t.String()
