@@ -50,8 +50,12 @@ type modGraph struct {
 }
 
 type moduleKey struct {
-	typ      reflect.Type
-	function uintptr
+	typ reflect.Type
+	// function identifies a ModuleFunc by the reflect.Value of the wrapped func.
+	// reflect.Value compares by the underlying func value, so closures created
+	// from the same func literal stay distinct — reflect.Value.Pointer would
+	// collapse them into their shared code pointer. It is nil for other modules.
+	function interface{}
 }
 
 var typeOfModuleFunc = reflect.TypeOf(ModuleFunc(nil))
@@ -207,13 +211,14 @@ func (mg *modGraph) addModule(order int, module Module) (int64, error) {
 
 // moduleKeyOf returns a comparable key that uniquely identifies a module.
 // Ordinary modules are keyed by reflect.Type. ModuleFunc values also include
-// their function pointer so distinct literals remain distinct.
+// the wrapped func value so that distinct funcs — including distinct closures
+// created from the same func literal — remain distinct modules.
 func moduleKeyOf(module Module) moduleKey {
 	modType := reflect.TypeOf(module)
 	key := moduleKey{typ: modType}
 
 	if modType == typeOfModuleFunc {
-		key.function = reflect.ValueOf(module).Pointer()
+		key.function = reflect.ValueOf(module)
 	}
 
 	return key
@@ -221,8 +226,8 @@ func moduleKeyOf(module Module) moduleKey {
 
 // name returns the display name used in module graph diagnostics.
 func (k moduleKey) name() string {
-	if k.typ == typeOfModuleFunc {
-		return fmt.Sprintf("%s_%d", qualifiedTypeName(k.typ), k.function)
+	if value, ok := k.function.(reflect.Value); ok {
+		return fmt.Sprintf("%s_%d", qualifiedTypeName(k.typ), value.Pointer())
 	}
 
 	return qualifiedTypeName(k.typ)

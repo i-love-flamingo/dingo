@@ -59,6 +59,30 @@ func TestResolveDependenciesWithModuleFunc(t *testing.T) {
 	assert.Equal(t, 1, countExtern, "variable defined modules should only be called once")
 }
 
+func TestResolveDependenciesWithModuleFuncClosures(t *testing.T) {
+	t.Parallel()
+
+	names := []string{"first", "second", "third"}
+
+	var configured []string
+
+	modules := make([]Module, 0, len(names))
+
+	// Every closure shares the code pointer of this single func literal, but
+	// each captures a different name and is therefore a distinct module.
+	for _, name := range names {
+		modules = append(modules, ModuleFunc(func(*Injector) {
+			configured = append(configured, name)
+		}))
+	}
+
+	injector, err := NewInjector(modules...)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, injector)
+	assert.Equal(t, names, configured, "closures created from the same func literal must all be configured, in registration order")
+}
+
 type (
 	resolveDependenciesModuleA  struct{}
 	resolveDependenciesModuleB  struct{}
