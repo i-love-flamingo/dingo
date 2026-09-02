@@ -1,5 +1,19 @@
 # Changelog
 
+## Version v0.4.1 (2026-09-02)
+
+### Fixes
+
+- key modules by exact type and preserve same-name bindings (#90) (b20705f6)
+
+### Chores and tidying
+
+- **deps:** update dependency golangci/golangci-lint to v2.13.2 (#96) (056dfb15)
+- **deps:** update module github.com/stretchr/testify to v1.12.1 (#95) (6006e00a)
+- use canonical reflect pointer constant (#94) (0cacc2a2)
+- **deps:** update actions/checkout action to v7 (#89) (4f3fe476)
+- **deps:** update actions/setup-go action to v7 (#91) (3eb0f95e)
+
 ## Version v0.4.0 (2026-06-25)
 
 ### Features
