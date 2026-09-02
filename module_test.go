@@ -1,6 +1,7 @@
 package dingo
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,6 +57,30 @@ func TestResolveDependenciesWithModuleFunc(t *testing.T) {
 	assert.NotNil(t, injector)
 	assert.Equal(t, 2, countInline, "inline modules should be called once (eventually twice for this test)")
 	assert.Equal(t, 1, countExtern, "variable defined modules should only be called once")
+}
+
+func TestResolveDependenciesWithModuleFuncClosures(t *testing.T) {
+	t.Parallel()
+
+	names := []string{"first", "second", "third"}
+
+	var configured []string
+
+	modules := make([]Module, 0, len(names))
+
+	// Every closure shares the code pointer of this single func literal, but
+	// each captures a different name and is therefore a distinct module.
+	for _, name := range names {
+		modules = append(modules, ModuleFunc(func(*Injector) {
+			configured = append(configured, name)
+		}))
+	}
+
+	injector, err := NewInjector(modules...)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, injector)
+	assert.Equal(t, names, configured, "closures created from the same func literal must all be configured, in registration order")
 }
 
 type (
@@ -180,7 +205,7 @@ func TestModGraph_Sorted(t *testing.T) {
 			modules: []Module{&A{withCycle: true}, new(B), new(D), new(E)},
 			assertErr: assert.ErrorAssertionFunc(func(t assert.TestingT, err error, i ...interface{}) bool {
 				return assert.ErrorIs(t, err, ErrModuleCycle) &&
-					assert.ErrorContains(t, err, "cyclic module dependency: *dingo.A → *dingo.C → *dingo.E")
+					assert.ErrorContains(t, err, "cyclic module dependency: *flamingo.me/dingo.A → *flamingo.me/dingo.C → *flamingo.me/dingo.E")
 			}),
 		},
 	}
@@ -196,6 +221,95 @@ func TestModGraph_Sorted(t *testing.T) {
 			if test.assertErr(t, err) {
 				assert.Equalf(t, test.sorted, sorted, "Sorted()")
 			}
+		})
+	}
+}
+
+type (
+	namedSlice   []int
+	namedPointer *int
+)
+
+func TestQualifiedTypeName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		typ  reflect.Type
+		want string
+	}{
+		{
+			name: "pointer to named struct",
+			typ:  reflect.TypeOf(&A{}),
+			want: "*flamingo.me/dingo.A",
+		},
+		{
+			name: "double pointer to named struct",
+			typ:  reflect.TypeOf((**A)(nil)),
+			want: "**flamingo.me/dingo.A",
+		},
+		{
+			name: "named slice",
+			typ:  reflect.TypeOf(namedSlice(nil)),
+			want: "flamingo.me/dingo.namedSlice",
+		},
+		{
+			name: "named pointer",
+			typ:  reflect.TypeOf(namedPointer(nil)),
+			want: "flamingo.me/dingo.namedPointer",
+		},
+		{
+			name: "builtin",
+			typ:  reflect.TypeOf(0),
+			want: "int",
+		},
+		{
+			name: "unnamed slice of builtin",
+			typ:  reflect.TypeOf([]int(nil)),
+			want: "[]int",
+		},
+		{
+			name: "unnamed slice of pointer to named struct",
+			typ:  reflect.TypeOf([]*A(nil)),
+			want: "[]*flamingo.me/dingo.A",
+		},
+		{
+			name: "unnamed array of pointer to named struct",
+			typ:  reflect.TypeOf([3]*A{}),
+			want: "[3]*flamingo.me/dingo.A",
+		},
+		{
+			name: "unnamed map with pointer to named struct value",
+			typ:  reflect.TypeOf(map[string]*A(nil)),
+			want: "map[string]*flamingo.me/dingo.A",
+		},
+		{
+			name: "unnamed bidirectional channel of pointer to named struct",
+			typ:  reflect.TypeOf(make(chan *A)),
+			want: "chan *flamingo.me/dingo.A",
+		},
+		{
+			name: "unnamed send-only channel of pointer to named struct",
+			typ:  reflect.TypeOf(make(chan<- *A)),
+			want: "chan<- *flamingo.me/dingo.A",
+		},
+		{
+			name: "unnamed receive-only channel of pointer to named struct",
+			typ:  reflect.TypeOf(make(<-chan *A)),
+			want: "<-chan *flamingo.me/dingo.A",
+		},
+		{
+			name: "anonymous struct falls back to Type.String",
+			typ:  reflect.TypeOf(struct{ X int }{}),
+			want: reflect.TypeOf(struct{ X int }{}).String(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, test.want, qualifiedTypeName(test.typ))
 		})
 	}
 }

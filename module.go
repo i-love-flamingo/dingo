@@ -44,9 +44,17 @@ var (
 // connected components with more than one node.
 type modGraph struct {
 	*simple.DirectedGraph
-	idMap map[int64]Module // node ID → Module
-	index map[string]int64 // moduleIdentity → node ID
-	order map[int64]int    // node ID → registration order (loop index from Add)
+	idMap map[int64]Module    // node ID → Module
+	index map[moduleKey]int64 // moduleKey → node ID
+	order map[int64]int       // node ID → registration order (loop index from Add)
+}
+
+type moduleKey struct {
+	typ reflect.Type
+	// function preserves ModuleFunc value identity. Different closures can share
+	// a code pointer, so reflect.Value keeps them distinct as it did before the
+	// module graph was introduced. It is nil for other modules.
+	function any
 }
 
 var typeOfModuleFunc = reflect.TypeOf(ModuleFunc(nil))
@@ -81,7 +89,7 @@ func newModuleGraph() *modGraph {
 	mg := &modGraph{
 		DirectedGraph: simple.NewDirectedGraph(),
 		idMap:         make(map[int64]Module),
-		index:         make(map[string]int64),
+		index:         make(map[moduleKey]int64),
 		order:         make(map[int64]int),
 	}
 
@@ -89,7 +97,7 @@ func newModuleGraph() *modGraph {
 }
 
 // Add adds each module and its transitive dependencies to the graph.
-// A module that is already present (identified by its type or by a pointer
+// A module that is already present (identified by its type or function value
 // for ModuleFunc) is skipped — only the first instance is kept.
 func (mg *modGraph) Add(modules ...Module) error {
 	for i, module := range modules {
@@ -131,7 +139,7 @@ func (mg *modGraph) Sort() ([]Module, error) {
 		for _, cycle := range cycles {
 			for _, node := range cycle {
 				if m, found := mg.idMap[node.ID()]; found {
-					names = append(names, moduleIdentity(m))
+					names = append(names, moduleName(m))
 				}
 			}
 
@@ -170,7 +178,7 @@ func (mg *modGraph) orderByInsertion(nodes []graph.Node) {
 // the order from their first registration.
 // It returns the graph node ID assigned to the module.
 func (mg *modGraph) addModule(order int, module Module) (int64, error) {
-	key := moduleIdentity(module)
+	key := moduleKeyOf(module)
 
 	processed, ok := mg.index[key]
 	if ok {
@@ -200,16 +208,70 @@ func (mg *modGraph) addModule(order int, module Module) (int64, error) {
 	return newNode.ID(), nil
 }
 
-// moduleIdentity returns a stable string key that uniquely identifies a module.
-// For ordinary module types the key is the fully qualified type name.
-// For ModuleFunc values the function pointer address is included so that
-// two distinct func literals are treated as different modules.
-func moduleIdentity(module Module) string {
+// moduleKeyOf returns a comparable key that uniquely identifies a module.
+// Ordinary modules are keyed by reflect.Type. ModuleFunc values also include
+// the wrapped func value so that distinct funcs — including distinct closures
+// created from the same func literal — remain distinct modules.
+func moduleKeyOf(module Module) moduleKey {
 	modType := reflect.TypeOf(module)
+	key := moduleKey{typ: modType}
+
 	if modType == typeOfModuleFunc {
-		value := reflect.ValueOf(module)
-		return fmt.Sprintf("%s_%d", value.Type(), value.Pointer())
+		key.function = reflect.ValueOf(module)
 	}
 
-	return modType.String()
+	return key
+}
+
+// name returns the display name used in module graph diagnostics.
+func (k moduleKey) name() string {
+	if value, ok := k.function.(reflect.Value); ok {
+		return fmt.Sprintf("%s_%d", qualifiedTypeName(k.typ), value.Pointer())
+	}
+
+	return qualifiedTypeName(k.typ)
+}
+
+// moduleName returns the display name used in module graph diagnostics for the given module.
+func moduleName(module Module) string {
+	return moduleKeyOf(module).name()
+}
+
+// qualifiedTypeName is like reflect.Type.String but uses the full import path
+// instead of the short package name for named types. It handles common
+// composite types recursively (pointer, slice, array, map, channel) so that
+// any named element/key type inside them is also fully qualified. Anonymous
+// composite types (struct, interface, func) fall back to reflect.Type.String,
+// as does anything else not covered above.
+func qualifiedTypeName(typ reflect.Type) string {
+	if typ.PkgPath() != "" {
+		return typ.PkgPath() + "." + typ.Name()
+	}
+
+	//nolint:exhaustive // only kinds that can wrap a named type are qualified, everything else falls back to reflect.Type.String
+	switch typ.Kind() {
+	case reflect.Pointer:
+		return "*" + qualifiedTypeName(typ.Elem())
+	case reflect.Slice:
+		return "[]" + qualifiedTypeName(typ.Elem())
+	case reflect.Array:
+		return fmt.Sprintf("[%d]%s", typ.Len(), qualifiedTypeName(typ.Elem()))
+	case reflect.Map:
+		return "map[" + qualifiedTypeName(typ.Key()) + "]" + qualifiedTypeName(typ.Elem())
+	case reflect.Chan:
+		var prefix string
+
+		switch typ.ChanDir() {
+		case reflect.RecvDir:
+			prefix = "<-chan "
+		case reflect.SendDir:
+			prefix = "chan<- "
+		case reflect.BothDir:
+			prefix = "chan "
+		}
+
+		return prefix + qualifiedTypeName(typ.Elem())
+	}
+
+	return typ.String()
 }
