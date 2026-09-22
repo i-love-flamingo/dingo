@@ -28,6 +28,30 @@ type (
 	loudGreeter struct {
 		Volume int
 	}
+
+	// greeterSlice injects a multibinding.
+	greeterSlice struct {
+		All []greeter `inject:""`
+	}
+
+	// annotatedGreeterSlice injects an annotated and an unannotated
+	// multibinding of the same type side by side.
+	annotatedGreeterSlice struct {
+		Plain     []greeter `inject:""`
+		Annotated []greeter `inject:"loud"`
+	}
+
+	// greeterMap injects a map binding.
+	greeterMap struct {
+		All map[string]greeter `inject:""`
+	}
+
+	// annotatedGreeterMap injects an annotated and an unannotated map
+	// binding of the same type side by side.
+	annotatedGreeterMap struct {
+		Plain     map[string]greeter `inject:""`
+		Annotated map[string]greeter `inject:"loud"`
+	}
 )
 
 func (g *helloGreeter) Greet() string {
@@ -36,4 +60,14 @@ func (g *helloGreeter) Greet() string {
 
 func (g loudGreeter) Greet() string {
 	return "HELLO"
+}
+
+func keysOf(m map[string]greeter) []string {
+	keys := make([]string, 0, len(m))
+
+	for key := range m {
+		keys = append(keys, key)
+	}
+
+	return keys
 }
