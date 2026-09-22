@@ -17,4 +17,23 @@ type (
 	counter struct {
 		N int
 	}
+
+	// helloGreeter is the default greeter implementation.
+	helloGreeter struct {
+		Name string
+	}
+
+	// loudGreeter is a second implementation, for precedence and
+	// disjointness assertions.
+	loudGreeter struct {
+		Volume int
+	}
 )
+
+func (g *helloGreeter) Greet() string {
+	return "hello"
+}
+
+func (g loudGreeter) Greet() string {
+	return "HELLO"
+}
