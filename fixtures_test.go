@@ -52,6 +52,14 @@ type (
 		Plain     map[string]greeter `inject:""`
 		Annotated map[string]greeter `inject:"loud"`
 	}
+
+	// greeterProvider is the generated-provider shape for greeter.
+	greeterProvider func() greeter
+
+	// greeterProviderField injects a Provider-suffixed func type.
+	greeterProviderField struct {
+		Provide greeterProvider `inject:""`
+	}
 )
 
 func (g *helloGreeter) Greet() string {
