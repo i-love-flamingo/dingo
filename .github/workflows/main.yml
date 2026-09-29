@@ -13,14 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [ '1.25', '1.*' ]
+        go: [ '1.26', 'go.mod', '1.*' ]
     name: Tests
     steps:
       - uses: actions/checkout@v7
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: ${{ matrix.go }}
+          go-version: ${{ matrix.go != 'go.mod' && matrix.go || '' }}
+          go-version-file: ${{ matrix.go == 'go.mod' && 'go.mod' || '' }}
+          check-latest: true
       - name: Get dependencies
         run: go get -v -t -d ./...
       - name: Test
@@ -37,6 +39,7 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go }}
+          check-latest: true
       - name: Get dependencies
         run: go get -v -t -d ./...
       - name: Test
@@ -67,6 +70,7 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go }}
+          check-latest: true
       - name: Get dependencies
         run: go get -v -t -d ./...
       - name: Go Vet

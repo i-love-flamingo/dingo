@@ -19,6 +19,7 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go }}
+          check-latest: true
       - name: Semanticore
         run: go run github.com/aoepeople/semanticore@main
         env:
