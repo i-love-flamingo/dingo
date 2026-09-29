@@ -1,6 +1,6 @@
 module flamingo.me/dingo
 
-go 1.26.8
+go 1.26.0
 
 require (
 	github.com/stretchr/testify v1.12.1
