@@ -1,5 +1,16 @@
 # Changelog
 
+## Version v0.4.2 (2026-09-30)
+
+### Ops and CI/CD
+
+- scan dependencies with govulncheck (#101) (c3d02bae)
+
+### Chores and tidying
+
+- require go 1.26.0 (#100) (037af0cf)
+- **deps:** update dependency golangci/golangci-lint to v2.14.0 (#98) (a7ec18a1)
+
 ## Version v0.4.1 (2026-09-02)
 
 ### Fixes
