@@ -104,7 +104,7 @@ func (p *Provider) Create(injector *Injector) (reflect.Value, error) {
 	in := make([]reflect.Value, p.fnc.Type().NumIn())
 	var err error
 	for i := 0; i < p.fnc.Type().NumIn(); i++ {
-		if in[i], err = injector.getInstance(p.fnc.Type().In(i), "", traceCircular); err != nil {
+		if in[i], err = injector.getInstance(p.fnc.Type().In(i), "", injector.newTrace()); err != nil {
 			return reflect.Value{}, err
 		}
 		for !in[i].Type().AssignableTo(p.fnc.Type().In(i)) && in[i].Kind() == reflect.Ptr {
@@ -112,5 +112,6 @@ func (p *Provider) Create(injector *Injector) (reflect.Value, error) {
 		}
 	}
 	res := p.fnc.Call(in)[0]
-	return res, injector.requestInjection(res, traceCircular)
+
+	return res, injector.requestInjection(res, injector.newTrace())
 }

@@ -30,13 +30,9 @@ type (
 )
 
 func TestDingoCircula(t *testing.T) {
-	EnableCircularTracing()
-	defer func() {
-		traceCircular = nil
-	}()
-
 	injector, err := NewInjector()
 	assert.NoError(t, err)
+	injector.EnableCircularTracing()
 
 	assert.Panics(t, func() {
 		i, err := injector.GetInstance(new(circA))
@@ -71,4 +67,30 @@ func TestDingoCircula(t *testing.T) {
 	assert.Panics(t, func() {
 		d.A()
 	})
+}
+
+func TestTracingDefaultsSeedNewInjectors(t *testing.T) { //nolint:paralleltest // mutates the package-level default
+	EnableCircularTracing()
+
+	defer func() {
+		defaultCircularTracing = false
+	}()
+
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+	assert.True(t, injector.circularTracing)
+}
+
+func TestChildInheritsTracingState(t *testing.T) {
+	t.Parallel()
+
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+	injector.EnableCircularTracing()
+	injector.EnableInjectionTracing()
+
+	child, err := injector.Child()
+	assert.NoError(t, err)
+	assert.True(t, child.circularTracing)
+	assert.True(t, child.injectionTracing)
 }

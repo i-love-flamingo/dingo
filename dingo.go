@@ -20,18 +20,29 @@ var (
 	ErrInvalidInjectReceiver = errors.New("usage of 'Inject' method with struct receiver is not allowed")
 	errPointersToInterface   = errors.New(" Do not use pointers to interface")
 
-	traceCircular    []circularTraceEntry
-	injectionTracing = false
+	// defaults seed every new injector with the tracing mode that the deprecated
+	// package-level Enable* functions set; they are read once, at construction.
+	defaultCircularTracing  = false
+	defaultInjectionTracing = false
 )
 
-// EnableCircularTracing activates dingo's trace feature to find circular dependencies
-// this is super expensive (memory wise), so it should only be used for debugging purposes
+// EnableCircularTracing activates dingo's trace feature to find circular dependencies.
+// This is super expensive (memory wise), so it should only be used for debugging purposes.
+//
+// Deprecated: sets the default for injectors created after this call; it does not
+// affect existing injectors. Prefer Injector.EnableCircularTracing, which scopes the
+// decision to one injector. Removal is planned for the next minor version.
 func EnableCircularTracing() {
-	traceCircular = make([]circularTraceEntry, 0)
+	defaultCircularTracing = true
 }
 
+// EnableInjectionTracing activates verbose logging of everything dingo injects.
+//
+// Deprecated: sets the default for injectors created after this call; it does not
+// affect existing injectors. Prefer Injector.EnableInjectionTracing, which scopes the
+// decision to one injector. Removal is planned for the next minor version.
 func EnableInjectionTracing() {
-	injectionTracing = true
+	defaultInjectionTracing = true
 }
 
 type (
@@ -48,6 +59,8 @@ type (
 		stage                uint                                 // current stage
 		delayed              []interface{}                        // delayed bindings
 		buildEagerSingletons bool                                 // whether to build singletons
+		circularTracing      bool                                 // circular-dependency tracing enabled
+		injectionTracing     bool                                 // verbose injection logging enabled
 	}
 
 	// overrides are evaluated lazy, so they are scheduled here
@@ -73,6 +86,8 @@ func NewInjector(modules ...Module) (*Injector, error) {
 		scopes:               make(map[reflect.Type]Scope),
 		stage:                DEFAULT,
 		buildEagerSingletons: true,
+		circularTracing:      defaultCircularTracing,
+		injectionTracing:     defaultInjectionTracing,
 	}
 
 	// bind current injector
@@ -98,6 +113,8 @@ func (injector *Injector) Child() (*Injector, error) {
 	}
 
 	newInjector.parent = injector
+	newInjector.circularTracing = injector.circularTracing
+	newInjector.injectionTracing = injector.injectionTracing
 	newInjector.Bind(Injector{}).ToInstance(newInjector)
 	newInjector.BindScope(NewChildSingletonScope()) // bind a new child-singleton
 
@@ -121,7 +138,7 @@ func (injector *Injector) InitModules(modules ...Module) error {
 	}
 
 	for _, module := range modules {
-		if err := injector.requestInjection(module, traceCircular); err != nil {
+		if err := injector.requestInjection(module, injector.newTrace()); err != nil {
 			erroredModule := reflect.TypeOf(module).Elem()
 			return fmt.Errorf("initmodules: injection into %q failed: %w", erroredModule.PkgPath()+"."+erroredModule.Name(), err)
 		}
@@ -167,7 +184,7 @@ func (injector *Injector) InitModules(modules ...Module) error {
 
 	// continue with delayed injections
 	for _, object := range injector.delayed {
-		if err := injector.requestInjection(object, traceCircular); err != nil {
+		if err := injector.requestInjection(object, injector.newTrace()); err != nil {
 			return err
 		}
 	}
@@ -186,12 +203,31 @@ func (injector *Injector) SetBuildEagerSingletons(build bool) {
 	injector.buildEagerSingletons = build
 }
 
+// EnableCircularTracing activates tracing of circular dependencies for this injector.
+// This is super expensive (memory wise), so it should only be used for debugging purposes.
+func (injector *Injector) EnableCircularTracing() {
+	injector.circularTracing = true
+}
+
+// EnableInjectionTracing activates verbose logging of everything this injector injects.
+func (injector *Injector) EnableInjectionTracing() {
+	injector.injectionTracing = true
+}
+
+// newTrace seeds a circular-dependency trace: empty when tracing is on, nil when off.
+func (injector *Injector) newTrace() []circularTraceEntry {
+	if injector.circularTracing {
+		return make([]circularTraceEntry, 0)
+	}
+	return nil
+}
+
 // BuildEagerSingletons requests one instance of each singleton, optional letting the parent injector(s) do the same
 func (injector *Injector) BuildEagerSingletons(includeParent bool) error {
 	for _, bindings := range injector.bindings {
 		for _, binding := range bindings {
 			if binding.eager {
-				if _, err := injector.getInstance(binding.typeof, binding.annotatedWith, traceCircular); err != nil {
+				if _, err := injector.getInstance(binding.typeof, binding.annotatedWith, injector.newTrace()); err != nil {
 					return fmt.Errorf("initmodules: loading eager singletons: %w", err)
 				}
 			}
@@ -205,7 +241,7 @@ func (injector *Injector) BuildEagerSingletons(includeParent bool) error {
 
 // GetInstance creates a new instance of what was requested
 func (injector *Injector) GetInstance(of interface{}) (interface{}, error) {
-	i, err := injector.getInstance(of, "", traceCircular)
+	i, err := injector.getInstance(of, "", injector.newTrace())
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +250,7 @@ func (injector *Injector) GetInstance(of interface{}) (interface{}, error) {
 
 // GetAnnotatedInstance creates a new instance of what was requested with the given annotation
 func (injector *Injector) GetAnnotatedInstance(of interface{}, annotatedWith string) (interface{}, error) {
-	i, err := injector.getInstance(of, annotatedWith, traceCircular)
+	i, err := injector.getInstance(of, annotatedWith, injector.newTrace())
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +340,7 @@ func (injector *Injector) intercept(final reflect.Value, t reflect.Type) (reflec
 	for _, interceptor := range injector.interceptor[t] {
 		of := final
 		final = reflect.New(interceptor)
-		if err := injector.requestInjection(final.Interface(), traceCircular); err != nil {
+		if err := injector.requestInjection(final.Interface(), injector.newTrace()); err != nil {
 			return reflect.Value{}, err
 		}
 		final.Elem().Field(0).Set(of)
@@ -360,10 +396,7 @@ func (injector *Injector) createInstanceOfAnnotatedType(t reflect.Type, annotati
 	// This for an injection request on a provider, such as `func() MyInstance`
 	if t.Kind() == reflect.Func && (t.NumOut() == 1 || t.NumOut() == 2) && strings.HasSuffix(t.Name(), "Provider") {
 		providerCanError := t.NumOut() == 2 && t.Out(1).AssignableTo(reflect.TypeOf(new(error)).Elem())
-		if traceCircular != nil {
-			return injector.createProvider(t, annotation, optional, providerCanError, make([]circularTraceEntry, 0)), nil
-		}
-		return injector.createProvider(t, annotation, optional, providerCanError, nil), nil
+		return injector.createProvider(t, annotation, optional, providerCanError), nil
 	}
 
 	// This is the injection request for multibindings
@@ -408,7 +441,7 @@ func (injector *Injector) createInstanceOfAnnotatedType(t reflect.Type, annotati
 		return n, injector.requestInjection(n.Interface(), subCircularTrace)
 	}
 
-	if injectionTracing {
+	if injector.injectionTracing {
 		if t.PkgPath() == "" || t.Name() == "" {
 			slog.Info(fmt.Sprintf("INJECTING: %s", t.String()))
 		} else {
@@ -429,10 +462,10 @@ func reflectedError(err *error, t reflect.Type) reflect.Value {
 	return rerr
 }
 
-func (injector *Injector) createProvider(t reflect.Type, annotation string, optional bool, canError bool, circularTrace []circularTraceEntry) reflect.Value {
-	return reflect.MakeFunc(t, func(args []reflect.Value) (results []reflect.Value) {
+func (injector *Injector) createProvider(typ reflect.Type, annotation string, optional bool, canError bool) reflect.Value {
+	return reflect.MakeFunc(typ, func(args []reflect.Value) (results []reflect.Value) {
 		// create a new type
-		res := reflect.New(t.Out(0))
+		res := reflect.New(typ.Out(0))
 		// dereference possible interface pointer
 		if res.Kind() == reflect.Ptr && (res.Elem().Kind() == reflect.Interface || res.Elem().Kind() == reflect.Ptr) {
 			res = res.Elem()
@@ -440,9 +473,9 @@ func (injector *Injector) createProvider(t reflect.Type, annotation string, opti
 
 		ret := func(v reflect.Value, err error) []reflect.Value {
 			if err != nil && !canError {
-				panic(fmt.Errorf("%q: %w", t, err))
+				panic(fmt.Errorf("%q: %w", typ, err))
 			} else if canError {
-				return []reflect.Value{v, reflectedError(&err, t)}
+				return []reflect.Value{v, reflectedError(&err, typ)}
 			} else {
 				return []reflect.Value{v}
 			}
@@ -450,15 +483,15 @@ func (injector *Injector) createProvider(t reflect.Type, annotation string, opti
 
 		// multibindings
 		if res.Elem().Kind() == reflect.Slice {
-			return ret(injector.createInstanceOfAnnotatedType(t.Out(0), annotation, optional, circularTrace))
+			return ret(injector.createInstanceOfAnnotatedType(typ.Out(0), annotation, optional, injector.newTrace()))
 		}
 
 		// mapbindings
 		if res.Elem().Kind() == reflect.Map && res.Elem().Type().Key().Kind() == reflect.String {
-			return ret(injector.createInstanceOfAnnotatedType(t.Out(0), annotation, optional, circularTrace))
+			return ret(injector.createInstanceOfAnnotatedType(typ.Out(0), annotation, optional, injector.newTrace()))
 		}
 
-		r := ret(injector.getInstance(t.Out(0), annotation, circularTrace))
+		r := ret(injector.getInstance(typ.Out(0), annotation, injector.newTrace()))
 
 		res.Set(r[0])
 		r[0] = res
@@ -467,8 +500,8 @@ func (injector *Injector) createProvider(t reflect.Type, annotation string, opti
 	})
 }
 
-func (injector *Injector) createProviderForBinding(t reflect.Type, binding *Binding, annotation string, optional bool, canError bool, circularTrace []circularTraceEntry) reflect.Value {
-	return reflect.MakeFunc(t, func(args []reflect.Value) (results []reflect.Value) {
+func (injector *Injector) createProviderForBinding(typ reflect.Type, binding *Binding, annotation string, optional bool, canError bool) reflect.Value {
+	return reflect.MakeFunc(typ, func(args []reflect.Value) (results []reflect.Value) {
 		// create a new type
 		res := reflect.New(binding.typeof)
 		// dereference possible interface pointer
@@ -476,26 +509,27 @@ func (injector *Injector) createProviderForBinding(t reflect.Type, binding *Bind
 			res = res.Elem()
 		}
 
-		if r, err := injector.resolveBinding(binding, t, optional, circularTrace); err == nil {
+		if r, err := injector.resolveBinding(binding, typ, optional, injector.newTrace()); err == nil {
 			res.Set(r)
 			if canError {
-				return []reflect.Value{res, reflectedError(nil, t)}
+				return []reflect.Value{res, reflectedError(nil, typ)}
 			}
 			return []reflect.Value{res}
 		}
 
 		// set to actual value
-		i, err := injector.getInstance(binding.typeof, annotation, circularTrace)
+		i, err := injector.getInstance(binding.typeof, annotation, injector.newTrace())
 		if err != nil {
 			if canError {
-				return []reflect.Value{res, reflectedError(&err, t)}
+				return []reflect.Value{res, reflectedError(&err, typ)}
 			}
-			panic(fmt.Errorf("%q: %w", t, err))
+
+			panic(fmt.Errorf("%q: %w", typ, err))
 		}
 		res.Set(i)
 		// return
 		if canError {
-			return []reflect.Value{res, reflectedError(nil, t)}
+			return []reflect.Value{res, reflectedError(nil, typ)}
 		}
 		return []reflect.Value{res}
 	})
@@ -537,7 +571,7 @@ func (injector *Injector) resolveMultibinding(t reflect.Type, annotation string,
 		n := reflect.MakeSlice(t, 0, len(bindings))
 		for _, binding := range bindings {
 			if provider {
-				n = reflect.Append(n, injector.createProviderForBinding(providerType, binding, annotation, false, providerCanError, circularTrace))
+				n = reflect.Append(n, injector.createProviderForBinding(providerType, binding, annotation, false, providerCanError))
 				continue
 			}
 
@@ -589,7 +623,7 @@ func (injector *Injector) resolveMapbinding(t reflect.Type, annotation string, o
 		n := reflect.MakeMapWithSize(t, len(bindings))
 		for key, binding := range bindings {
 			if provider {
-				n.SetMapIndex(reflect.ValueOf(key), injector.createProviderForBinding(providerType, binding, annotation, false, providerCanError, circularTrace))
+				n.SetMapIndex(reflect.ValueOf(key), injector.createProviderForBinding(providerType, binding, annotation, false, providerCanError))
 				continue
 			}
 
@@ -688,7 +722,7 @@ func (injector *Injector) RequestInjection(object interface{}) error {
 	if injector.stage == INIT {
 		injector.delayed = append(injector.delayed, object)
 	} else {
-		return injector.requestInjection(object, traceCircular)
+		return injector.requestInjection(object, injector.newTrace())
 	}
 	return nil
 }
@@ -772,7 +806,7 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 						}
 					}
 					if field.Kind() != reflect.Ptr && field.Kind() != reflect.Interface && instance.Kind() == reflect.Ptr {
-						if injectionTracing {
+						if injector.injectionTracing {
 							slog.Info(fmt.Sprintf("SETTING FIELD: %s of type \"%s\"", currentFieldName, ctype.Field(fieldIndex).Type.String()))
 						}
 
@@ -782,7 +816,7 @@ func (injector *Injector) requestInjection(object interface{}, circularTrace []c
 							return wrapErr(fmt.Errorf("field %#v is pointer to interface. %w", currentFieldName, errPointersToInterface))
 						}
 
-						if injectionTracing {
+						if injector.injectionTracing {
 							slog.Info(fmt.Sprintf("SETTING FIELD: %s of type \"%s\"", currentFieldName, ctype.Field(fieldIndex).Type.String()))
 						}
 
