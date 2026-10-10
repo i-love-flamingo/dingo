@@ -96,6 +96,33 @@ func newModuleGraph() *modGraph {
 	return mg
 }
 
+// ExpandModules expands modules and their transitive Depends() dependencies
+// and returns them in initialization order: every dependency appears before
+// the modules that depend on it, and modules that are independent of each
+// other keep their input order.
+//
+// Modules are deduplicated by identity: their reflect.Type, or the wrapped
+// func value for ModuleFunc — distinct closures count as distinct modules.
+// The first occurrence wins. The input slice is not modified.
+//
+// The result is idempotent: expanding an already-expanded list returns it
+// unchanged, and InitModules re-expands it into the same order, so callers
+// can resolve early (for example to collect configuration) and hand the
+// result to InitModules afterwards.
+//
+// A cyclic dependency is reported as an error wrapping ErrModuleCycle,
+// with the cycle's module names; other sorting failures wrap ErrModuleSort.
+// Depends() is called once per distinct module during the call.
+func ExpandModules(modules ...Module) ([]Module, error) {
+	mg := newModuleGraph()
+
+	if err := mg.Add(modules...); err != nil {
+		return nil, err
+	}
+
+	return mg.Sort()
+}
+
 // Add adds each module and its transitive dependencies to the graph.
 // A module that is already present (identified by its type or function value
 // for ModuleFunc) is skipped — only the first instance is kept.
