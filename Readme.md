@@ -60,6 +60,33 @@ func (module *BillingModule) Configure(injector *dingo.Injector) {
 }
 ```
 
+## Expanding modules before initialization
+
+`ExpandModules` returns modules and their dependencies in initialization order.
+It keeps the first module of each ordinary type and treats distinct `ModuleFunc`
+closures as distinct modules. The returned modules retain their concrete types
+and optional interfaces, so callers can collect configuration before initialization.
+
+Initialize the exact list with `InitExpandedModules`. It keeps the supplied order,
+deduplicates by the same identities, and does not call `Depends` again:
+
+```go
+modules, err := dingo.ExpandModules(applicationModules...)
+if err != nil {
+	return err
+}
+injector, err := dingo.NewInjector()
+if err != nil {
+	return err
+}
+return injector.InitExpandedModules(modules...)
+```
+
+`InitModules` and `TryModule` still expand dependencies. Repeated expansion is
+stable when `Depends` returns the same dependency identities; fresh closures can
+add new modules on each call. `TryExpandedModules` checks the supplied list without
+re-expanding it, recovers configuration panics, and skips eager singleton construction.
+
 ## Requesting injection
 
 Every instance that is created through the container can use injection. 

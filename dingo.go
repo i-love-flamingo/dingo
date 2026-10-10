@@ -135,6 +135,34 @@ func (injector *Injector) InitModules(modules ...Module) error {
 		return fmt.Errorf("%w: failed sorting modules: %w", ErrInitModules, err)
 	}
 
+	return injector.initModules(modules)
+}
+
+// InitExpandedModules initializes the supplied modules in order without calling
+// Depends. It keeps the first occurrence of each module identity and does not
+// modify the input slice. Use it to initialize an exact ExpandModules snapshot.
+func (injector *Injector) InitExpandedModules(modules ...Module) error {
+	unique := make([]Module, 0, len(modules))
+	seen := make(map[moduleKey]struct{}, len(modules))
+
+	for _, module := range modules {
+		key := moduleKeyOf(module)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+
+		seen[key] = struct{}{}
+
+		unique = append(unique, module)
+	}
+
+	return injector.initModules(unique)
+}
+
+//nolint:gocognit,cyclop // shared finalization preserves the existing initialization behavior
+func (injector *Injector) initModules(modules []Module) error {
+	injector.stage = INIT
+
 	for _, module := range modules {
 		if err := injector.requestInjection(module, injector.newTrace()); err != nil {
 			erroredModule := reflect.TypeOf(module).Elem()

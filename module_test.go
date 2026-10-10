@@ -387,7 +387,7 @@ func TestExpandModules(t *testing.T) {
 		}, modules)
 	})
 
-	t.Run("is idempotent", func(t *testing.T) {
+	t.Run("is stable when dependency identities are stable", func(t *testing.T) {
 		t.Parallel()
 
 		once, err := ExpandModules(new(expandModuleTop))
