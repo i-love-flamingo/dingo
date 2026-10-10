@@ -508,5 +508,9 @@ Dingo has a wrapper for `func(*Injector)` called `ModuleFunc`. It is possible to
 This is similar to the `http` Packages `HandlerFunc` mechanism and allows to save code and easier set up small projects.
 
 ## Troubleshooting
-1. To trace possible circular injections Dingo has method `Injector.EnableCircularTracing()`, which also switches slog to DEBUG level. This makes execution very heavy in terms of memory, so should be used only for debug purposes. The deprecated package-level `EnableCircularTracing()` sets the same mode as a default for injectors created after the call.
-2. To trace possible injection issues, like when Dingo tries to inject dependency into unexported field and fails, and user does not know where this happens, Dingo has method `Injector.EnableInjectionTracing()`, which is also sets slog level to DEBUG. The deprecated package-level `EnableInjectionTracing()` sets the default for injectors created after the call.
+
+Use `Injector.EnableCircularTracing()` to detect circular dependencies. Tracing uses extra memory and is intended for debugging. Generated providers retain only constructions that are still active when called. Once those constructions finish, deferred provider calls start an empty enabled trace.
+
+A provider called while its origin is still being constructed inherits that active ancestry, including calls from another goroutine. An independent call that overlaps the origin's construction follows the same rule: a zero-argument provider cannot distinguish its callers. Each call has a separate trace branch, and finished constructions are ignored even if they finish during the call.
+
+Use `Injector.EnableInjectionTracing()` to log what an injector injects and which fields it sets. Neither tracing method changes the slog level. The deprecated package-level `EnableCircularTracing()` and `EnableInjectionTracing()` functions set defaults for injectors created after the call; they do not change existing injectors.

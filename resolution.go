@@ -90,15 +90,15 @@ func (injector *Injector) getInstanceOfTypeWithAnnotation(typ reflect.Type, anno
 		return reflect.Value{}, fmt.Errorf("can not resolve %q", typ.String()) //nolint:err113 // message text is part of the observed behaviour
 	}
 
-	return injector.intercept(final, typ)
+	return injector.intercept(final, typ, circularTrace)
 }
 
-func (injector *Injector) intercept(final reflect.Value, typ reflect.Type) (reflect.Value, error) {
+func (injector *Injector) intercept(final reflect.Value, typ reflect.Type, circularTrace []circularTraceEntry) (reflect.Value, error) {
 	for _, interceptor := range injector.interceptor[typ] {
 		of := final
 
 		final = reflect.New(interceptor)
-		if err := injector.requestInjection(final.Interface(), injector.newTrace()); err != nil {
+		if err := injector.requestInjection(final.Interface(), circularTrace); err != nil {
 			return reflect.Value{}, err
 		}
 
@@ -106,7 +106,7 @@ func (injector *Injector) intercept(final reflect.Value, typ reflect.Type) (refl
 	}
 
 	if injector.parent != nil {
-		return injector.parent.intercept(final, typ)
+		return injector.parent.intercept(final, typ, circularTrace)
 	}
 
 	return final, nil
@@ -127,7 +127,7 @@ func (injector *Injector) resolveBinding(binding *Binding, typ reflect.Type, opt
 	}
 
 	if binding.provider != nil {
-		return binding.provider.Create(injector)
+		return binding.provider.create(injector, circularTrace)
 	}
 
 	if binding.to != nil {
@@ -143,7 +143,7 @@ func (injector *Injector) resolveBinding(binding *Binding, typ reflect.Type, opt
 
 // createInstanceOfAnnotatedType resolves a type request with the current injector
 //
-//nolint:gocognit,cyclop // complexity predates the move, restructuring is out of scope
+//nolint:cyclop // complexity predates the move, restructuring is out of scope
 func (injector *Injector) createInstanceOfAnnotatedType(typ reflect.Type, annotation string, optional bool, circularTrace []circularTraceEntry) (reflect.Value, error) {
 	if binding := injector.findBindingForAnnotatedType(typ, annotation); binding != nil {
 		r, err := injector.resolveBinding(binding, typ, optional, circularTrace)
@@ -159,7 +159,7 @@ func (injector *Injector) createInstanceOfAnnotatedType(typ reflect.Type, annota
 
 	// This for an injection request on a provider, such as `func() MyInstance`
 	if isProviderType(typ) && (typ.NumOut() == 1 || typ.NumOut() == 2) {
-		return injector.createProvider(typ, annotation, optional, providerCanError(typ)), nil
+		return injector.createProvider(typ, annotation, optional, providerCanError(typ), circularTrace), nil
 	}
 
 	// This is the injection request for multibindings
@@ -185,21 +185,8 @@ func (injector *Injector) createInstanceOfAnnotatedType(typ reflect.Type, annota
 	}
 
 	if circularTrace != nil {
-		for _, ct := range circularTrace {
-			if ct.typ == typ && ct.annotation == annotation {
-				for _, ct := range circularTrace {
-					slog.Info(fmt.Sprintf("%s#%s: %s", ct.typ.PkgPath(), ct.typ.Name(), ct.annotation))
-				}
-
-				slog.Info(fmt.Sprintf("%s#%s: %s", typ.PkgPath(), typ.Name(), annotation))
-
-				panic("detected circular dependency")
-			}
-		}
-
-		subCircularTrace := make([]circularTraceEntry, 0, len(circularTrace)+1)
-		subCircularTrace = append(subCircularTrace, circularTrace...)
-		subCircularTrace = append(subCircularTrace, circularTraceEntry{typ, annotation})
+		subCircularTrace := startConstructionTrace(circularTrace, typ, annotation)
+		defer subCircularTrace[len(subCircularTrace)-1].active.Store(false)
 
 		instance := reflect.New(typ)
 
@@ -231,8 +218,10 @@ func reflectedError(err *error, typ reflect.Type) reflect.Value {
 }
 
 //nolint:cyclop // complexity predates the move, restructuring is out of scope
-func (injector *Injector) createProvider(typ reflect.Type, annotation string, optional bool, canError bool) reflect.Value {
+func (injector *Injector) createProvider(typ reflect.Type, annotation string, optional bool, canError bool, circularTrace []circularTraceEntry) reflect.Value {
 	return reflect.MakeFunc(typ, func(args []reflect.Value) (results []reflect.Value) {
+		trace := injector.resumeTrace(circularTrace)
+
 		// create a new type
 		res := reflect.New(typ.Out(0))
 		// dereference possible interface pointer
@@ -253,15 +242,15 @@ func (injector *Injector) createProvider(typ reflect.Type, annotation string, op
 
 		// multibindings
 		if res.Elem().Kind() == reflect.Slice {
-			return ret(injector.createInstanceOfAnnotatedType(typ.Out(0), annotation, optional, injector.newTrace()))
+			return ret(injector.createInstanceOfAnnotatedType(typ.Out(0), annotation, optional, trace))
 		}
 
 		// mapbindings
 		if res.Elem().Kind() == reflect.Map && res.Elem().Type().Key().Kind() == reflect.String {
-			return ret(injector.createInstanceOfAnnotatedType(typ.Out(0), annotation, optional, injector.newTrace()))
+			return ret(injector.createInstanceOfAnnotatedType(typ.Out(0), annotation, optional, trace))
 		}
 
-		r := ret(injector.getInstance(typ.Out(0), annotation, injector.newTrace()))
+		r := ret(injector.getInstance(typ.Out(0), annotation, trace))
 
 		res.Set(r[0])
 		r[0] = res
@@ -270,8 +259,10 @@ func (injector *Injector) createProvider(typ reflect.Type, annotation string, op
 	})
 }
 
-func (injector *Injector) createProviderForBinding(typ reflect.Type, binding *Binding, annotation string, optional bool, canError bool) reflect.Value {
+func (injector *Injector) createProviderForBinding(typ reflect.Type, binding *Binding, annotation string, optional bool, canError bool, circularTrace []circularTraceEntry) reflect.Value {
 	return reflect.MakeFunc(typ, func(args []reflect.Value) (results []reflect.Value) {
+		trace := injector.resumeTrace(circularTrace)
+
 		// create a new type
 		res := reflect.New(binding.typeof)
 		// dereference possible interface pointer
@@ -279,7 +270,7 @@ func (injector *Injector) createProviderForBinding(typ reflect.Type, binding *Bi
 			res = res.Elem()
 		}
 
-		if r, err := injector.resolveBinding(binding, typ, optional, injector.newTrace()); err == nil {
+		if r, err := injector.resolveBinding(binding, typ, optional, trace); err == nil {
 			res.Set(r)
 
 			if canError {
@@ -290,7 +281,7 @@ func (injector *Injector) createProviderForBinding(typ reflect.Type, binding *Bi
 		}
 
 		// set to actual value
-		i, err := injector.getInstance(binding.typeof, annotation, injector.newTrace())
+		i, err := injector.getInstance(binding.typeof, annotation, trace)
 		if err != nil {
 			if canError {
 				return []reflect.Value{res, reflectedError(&err, typ)}
@@ -347,7 +338,7 @@ func (injector *Injector) resolveMultibinding(typ reflect.Type, annotation strin
 		slice := reflect.MakeSlice(typ, 0, len(bindings))
 		for _, binding := range bindings {
 			if provider {
-				slice = reflect.Append(slice, injector.createProviderForBinding(providerType, binding, annotation, false, canError))
+				slice = reflect.Append(slice, injector.createProviderForBinding(providerType, binding, annotation, false, canError, circularTrace))
 				continue
 			}
 
@@ -403,7 +394,7 @@ func (injector *Injector) resolveMapbinding(typ reflect.Type, annotation string,
 		result := reflect.MakeMapWithSize(typ, len(bindings))
 		for key, binding := range bindings {
 			if provider {
-				result.SetMapIndex(reflect.ValueOf(key), injector.createProviderForBinding(providerType, binding, annotation, false, canError))
+				result.SetMapIndex(reflect.ValueOf(key), injector.createProviderForBinding(providerType, binding, annotation, false, canError, circularTrace))
 				continue
 			}
 

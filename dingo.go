@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync/atomic"
 )
 
 const (
@@ -20,8 +21,8 @@ var (
 
 	// defaults seed every new injector with the tracing mode that the deprecated
 	// package-level Enable* functions set; they are read once, at construction.
-	defaultCircularTracing  = false
-	defaultInjectionTracing = false
+	defaultCircularTracing  atomic.Bool
+	defaultInjectionTracing atomic.Bool
 )
 
 // EnableCircularTracing activates dingo's trace feature to find circular dependencies.
@@ -31,7 +32,7 @@ var (
 // affect existing injectors. Prefer Injector.EnableCircularTracing, which scopes the
 // decision to one injector. Removal is planned for the next minor version.
 func EnableCircularTracing() {
-	defaultCircularTracing = true
+	defaultCircularTracing.Store(true)
 }
 
 // EnableInjectionTracing activates verbose logging of everything dingo injects.
@@ -40,7 +41,7 @@ func EnableCircularTracing() {
 // affect existing injectors. Prefer Injector.EnableInjectionTracing, which scopes the
 // decision to one injector. Removal is planned for the next minor version.
 func EnableInjectionTracing() {
-	defaultInjectionTracing = true
+	defaultInjectionTracing.Store(true)
 }
 
 type (
@@ -71,6 +72,7 @@ type (
 	circularTraceEntry struct {
 		typ        reflect.Type
 		annotation string
+		active     *atomic.Bool
 	}
 )
 
@@ -84,8 +86,8 @@ func NewInjector(modules ...Module) (*Injector, error) {
 		scopes:               make(map[reflect.Type]Scope),
 		stage:                DEFAULT,
 		buildEagerSingletons: true,
-		circularTracing:      defaultCircularTracing,
-		injectionTracing:     defaultInjectionTracing,
+		circularTracing:      defaultCircularTracing.Load(),
+		injectionTracing:     defaultInjectionTracing.Load(),
 	}
 
 	// bind current injector
@@ -232,6 +234,9 @@ func (injector *Injector) SetBuildEagerSingletons(build bool) {
 
 // EnableCircularTracing activates tracing of circular dependencies for this injector.
 // This is super expensive (memory wise), so it should only be used for debugging purposes.
+// Generated providers inherit constructions that are still active when called,
+// including overlapping calls from other goroutines. Finished constructions are
+// ignored, so deferred calls start a new trace once their origin has finished.
 func (injector *Injector) EnableCircularTracing() {
 	injector.circularTracing = true
 }
@@ -239,15 +244,6 @@ func (injector *Injector) EnableCircularTracing() {
 // EnableInjectionTracing activates verbose logging of everything this injector injects.
 func (injector *Injector) EnableInjectionTracing() {
 	injector.injectionTracing = true
-}
-
-// newTrace seeds a circular-dependency trace: empty when tracing is on, nil when off.
-func (injector *Injector) newTrace() []circularTraceEntry {
-	if injector.circularTracing {
-		return make([]circularTraceEntry, 0)
-	}
-
-	return nil
 }
 
 // BuildEagerSingletons requests one instance of each singleton, optional letting the parent injector(s) do the same

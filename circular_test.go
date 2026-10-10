@@ -1,6 +1,7 @@
 package dingo
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -70,10 +71,12 @@ func TestDingoCircula(t *testing.T) {
 }
 
 func TestTracingDefaultsSeedNewInjectors(t *testing.T) { //nolint:paralleltest // mutates the package-level default
+	previous := defaultCircularTracing.Load()
+
 	EnableCircularTracing()
 
 	defer func() {
-		defaultCircularTracing = false
+		defaultCircularTracing.Store(previous)
 	}()
 
 	injector, err := NewInjector()
@@ -93,4 +96,44 @@ func TestChildInheritsTracingState(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, child.circularTracing)
 	assert.True(t, child.injectionTracing)
+}
+
+func TestTracingDefaultsConcurrentConstruction(t *testing.T) { //nolint:paralleltest // changes defaults and restores them after both workers finish
+	circular, injection := defaultCircularTracing.Load(), defaultInjectionTracing.Load()
+
+	t.Cleanup(func() {
+		defaultCircularTracing.Store(circular)
+		defaultInjectionTracing.Store(injection)
+	})
+
+	var workers sync.WaitGroup
+
+	start := make(chan struct{})
+
+	workers.Add(2)
+	go func() {
+		defer workers.Done()
+
+		<-start
+
+		for range 1000 {
+			EnableCircularTracing()
+			EnableInjectionTracing()
+		}
+	}()
+	go func() {
+		defer workers.Done()
+
+		<-start
+
+		for range 1000 {
+			if _, err := NewInjector(); err != nil {
+				t.Error(err)
+				return
+			}
+		}
+	}()
+
+	close(start)
+	workers.Wait()
 }
