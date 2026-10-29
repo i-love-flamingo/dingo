@@ -33,11 +33,11 @@ func TestBindMulti_AnnotationsProduceDisjointSlices(t *testing.T) {
 	resolved, err := injector.GetInstance(new(annotatedGreeterSlice))
 	require.NoError(t, err)
 
-	slices := resolved.(*annotatedGreeterSlice)
-	require.Len(t, slices.Plain, 1)
-	require.Len(t, slices.Annotated, 1)
-	assert.Equal(t, "hello", slices.Plain[0].Greet())
-	assert.Equal(t, "HELLO", slices.Annotated[0].Greet())
+	entries := resolved.(*annotatedGreeterSlice)
+	require.Len(t, entries.Plain, 1)
+	require.Len(t, entries.Annotated, 1)
+	assert.Equal(t, "hello", entries.Plain[0].Greet())
+	assert.Equal(t, "HELLO", entries.Annotated[0].Greet())
 }
 
 func TestBindMulti_EmptyResolvesToNonNilEmptySlice(t *testing.T) {
@@ -64,21 +64,24 @@ func TestBindMap_EmptyResolvesToNonNilEmptyMap(t *testing.T) {
 	assert.Empty(t, resolved.(map[string]greeter))
 }
 
-func TestBindMap_DuplicateKeySilentlyOverwrites(t *testing.T) {
+func TestBindMap_DuplicateKeyKeepsOneEntry(t *testing.T) {
 	t.Parallel()
 
-	// Observed behavior, not a guarantee: a second BindMap for one key wins
-	// without an error, where two singular bindings for one key would fail.
-	injector := newInjector(t)
-	injector.BindMap(new(greeter), "greeter").To(helloGreeter{})
-	injector.BindMap(new(greeter), "greeter").To(loudGreeter{})
+	// Observed behavior, not a guarantee: two BindMap calls for one key in a
+	// module do not fail InitModules, and the map holds one entry for the key.
+	// Which of the two wins is not asserted: the silent overwrite may become a
+	// log line later.
+	injector := newInjector(t, dingo.ModuleFunc(func(injector *dingo.Injector) {
+		injector.BindMap(new(greeter), "greeter").To(helloGreeter{})
+		injector.BindMap(new(greeter), "greeter").To(loudGreeter{})
+	}))
 
 	resolved, err := injector.GetInstance(new(greeterMap))
 	require.NoError(t, err)
 
 	entries := resolved.(*greeterMap).All
 	require.Len(t, entries, 1)
-	assert.Equal(t, "HELLO", entries["greeter"].Greet())
+	assert.Contains(t, []string{"hello", "HELLO"}, entries["greeter"].Greet())
 }
 
 func TestBindMap_AnnotationsProduceDisjointMaps(t *testing.T) {
@@ -91,9 +94,9 @@ func TestBindMap_AnnotationsProduceDisjointMaps(t *testing.T) {
 	resolved, err := injector.GetInstance(new(annotatedGreeterMap))
 	require.NoError(t, err)
 
-	maps := resolved.(*annotatedGreeterMap)
-	assert.Equal(t, []string{"plain"}, keysOf(maps.Plain))
-	assert.Equal(t, []string{"annotated"}, keysOf(maps.Annotated))
+	entries := resolved.(*annotatedGreeterMap)
+	assert.Equal(t, []string{"plain"}, keysOf(entries.Plain))
+	assert.Equal(t, []string{"annotated"}, keysOf(entries.Annotated))
 }
 
 func TestBindMap_ChildOverridesParentKey(t *testing.T) {

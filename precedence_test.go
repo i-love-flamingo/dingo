@@ -73,10 +73,11 @@ func TestGetAnnotatedInstance_MapPrefixIsASpecialLookup(t *testing.T) {
 	t.Run("fetches one map binding entry", func(t *testing.T) {
 		t.Parallel()
 
+		// A one-character key pins the lower end of the length guard.
 		injector := newInjector(t)
-		injector.BindMap(new(greeter), "hello").To(helloGreeter{})
+		injector.BindMap(new(greeter), "h").To(helloGreeter{})
 
-		resolved, err := injector.GetAnnotatedInstance(new(greeter), "map:hello")
+		resolved, err := injector.GetAnnotatedInstance(new(greeter), "map:h")
 		require.NoError(t, err)
 		assert.Equal(t, "hello", resolved.(greeter).Greet())
 	})
@@ -84,8 +85,9 @@ func TestGetAnnotatedInstance_MapPrefixIsASpecialLookup(t *testing.T) {
 	t.Run("the four character annotation is not a map lookup", func(t *testing.T) {
 		t.Parallel()
 
+		// The empty key is bound, so a lookup would find it.
 		injector := newInjector(t)
-		injector.BindMap(new(greeter), "hello").To(helloGreeter{})
+		injector.BindMap(new(greeter), "").To(helloGreeter{})
 
 		_, err := injector.GetAnnotatedInstance(new(greeter), "map:")
 

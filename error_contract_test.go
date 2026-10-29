@@ -2,6 +2,7 @@ package dingo_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"flamingo.me/dingo"
@@ -119,19 +120,18 @@ func TestTryModule_PassesThroughErrorPanicsUnchanged(t *testing.T) {
 	err := dingo.TryModule(panicModule{})
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, errConfigure)
+	assert.Same(t, errConfigure, err)
 }
 
-func TestTryModule_WrapsNonErrorPanicsWithQFormatting(t *testing.T) {
+func TestTryModule_ConvertsNonErrorPanicsToAnError(t *testing.T) {
 	t.Parallel()
 
-	// Observed behavior, not a guarantee: the message is %q of the panic
-	// value, so an int renders as a character literal. Asserted verbatim
-	// because the surprise is the point, not because the format is fixed.
+	// Only the prefix is asserted. The panic value is formatted with %q, so
+	// panic(42) currently reads as '*', which is not worth pinning.
 	err := dingo.TryModule(panicWithNonErrorModule{})
 
 	require.Error(t, err)
-	assert.EqualError(t, err, "dingo.TryModule panic: '*'")
+	assert.True(t, strings.HasPrefix(err.Error(), "dingo.TryModule panic: "), err.Error())
 }
 
 func TestInitModules_CycleWrapsBothSentinels(t *testing.T) {

@@ -19,13 +19,18 @@ import (
 // so In(dingo.Singleton) keeps selecting the singleton scope and resolves
 // through the private cache.
 //
-// Derive children with child(t), never with the promoted Child(): the
-// promoted method compiles and returns an injector that resolves
-// In(dingo.Singleton) in the process-wide cache.
+// Derive children with child(t). The promoted Child() is shadowed below,
+// because its injector resolves In(dingo.Singleton) in the process-wide cache.
 type isolatedInjector struct {
 	*dingo.Injector
 
 	singleton dingo.Scope
+}
+
+// Child shadows (*dingo.Injector).Child, so a call that expects an injector
+// back does not compile. Use child(t) instead.
+func (*isolatedInjector) Child() {
+	panic("use child(t) to derive a child of an isolatedInjector")
 }
 
 // newInjector returns an injector with a private singleton and child-singleton
@@ -60,7 +65,7 @@ func newInjector(t *testing.T, modules ...dingo.Module) *isolatedInjector {
 func (i *isolatedInjector) child(t *testing.T) *isolatedInjector {
 	t.Helper()
 
-	child, err := i.Child()
+	child, err := i.Injector.Child()
 	require.NoError(t, err)
 
 	child.BindScope(i.singleton)

@@ -91,10 +91,6 @@ func (s *spyInspector) inspector() dingo.Inspector {
 	}
 }
 
-func typeOf[T any]() reflect.Type {
-	return reflect.TypeFor[T]()
-}
-
 func TestInspect_BindingCallbackReportsTargetProviderInstanceAndScope(t *testing.T) {
 	t.Parallel()
 
@@ -112,11 +108,11 @@ func TestInspect_BindingCallbackReportsTargetProviderInstanceAndScope(t *testing
 	spy := newSpyInspector()
 	injector.Inspect(spy.inspector())
 
-	greeters := spy.bindings[typeOf[greeter]()]
+	greeters := spy.bindings[reflect.TypeFor[greeter]()]
 	require.Len(t, greeters, 2)
 
 	assert.Equal(t, "", greeters[0].annotation)
-	assert.Equal(t, typeOf[helloGreeter](), greeters[0].to)
+	assert.Equal(t, reflect.TypeFor[helloGreeter](), greeters[0].to)
 	assert.Nil(t, greeters[0].instance)
 	assert.Nil(t, greeters[0].scope)
 
@@ -125,13 +121,13 @@ func TestInspect_BindingCallbackReportsTargetProviderInstanceAndScope(t *testing
 	require.NotNil(t, greeters[1].instance)
 	assert.Equal(t, loudGreeter{}, greeters[1].instance.Interface())
 
-	counters := spy.bindings[typeOf[counter]()]
+	counters := spy.bindings[reflect.TypeFor[counter]()]
 	require.Len(t, counters, 1)
 	assert.Same(t, scope, counters[0].scope)
 
-	strings := spy.bindings[typeOf[string]()]
-	require.Len(t, strings, 1)
-	assert.NotNil(t, strings[0].provider)
+	providedStrings := spy.bindings[reflect.TypeFor[string]()]
+	require.Len(t, providedStrings, 1)
+	assert.NotNil(t, providedStrings[0].provider)
 }
 
 func TestInspect_MultiBindingCallbackReportsIndexAcrossAnnotations(t *testing.T) {
@@ -149,11 +145,11 @@ func TestInspect_MultiBindingCallbackReportsIndexAcrossAnnotations(t *testing.T)
 	// Observed behavior, not a guarantee: the index is the position in the
 	// per-type slice and is not filtered by annotation.
 	assert.Equal(t, []inspectedMultiBinding{
-		{index: 0, annotation: "", to: typeOf[helloGreeter]()},
-		{index: 1, annotation: "loud", to: typeOf[loudGreeter]()},
+		{index: 0, annotation: "", to: reflect.TypeFor[helloGreeter]()},
+		{index: 1, annotation: "loud", to: reflect.TypeFor[loudGreeter]()},
 		{index: 2, annotation: "", to: nil, hasInstance: true},
 		{index: 3, annotation: "", to: nil, hasProvider: true},
-	}, spy.multiBindings[typeOf[greeter]()])
+	}, spy.multiBindings[reflect.TypeFor[greeter]()])
 }
 
 func TestInspect_MapBindingCallbackFiresPerKey(t *testing.T) {
@@ -169,11 +165,11 @@ func TestInspect_MapBindingCallbackFiresPerKey(t *testing.T) {
 	injector.Inspect(spy.inspector())
 
 	assert.ElementsMatch(t, []inspectedMapBinding{
-		{key: "hello", annotation: "", to: typeOf[helloGreeter]()},
-		{key: "loud", annotation: "loud", to: typeOf[loudGreeter]()},
+		{key: "hello", annotation: "", to: reflect.TypeFor[helloGreeter]()},
+		{key: "loud", annotation: "loud", to: reflect.TypeFor[loudGreeter]()},
 		{key: "instance", annotation: "", to: nil, hasInstance: true},
 		{key: "provided", annotation: "", to: nil, hasProvider: true},
-	}, spy.mapBindings[typeOf[greeter]()])
+	}, spy.mapBindings[reflect.TypeFor[greeter]()])
 }
 
 func TestInspect_ParentCallbackFiresOnlyForAChild(t *testing.T) {
@@ -190,11 +186,13 @@ func TestInspect_ParentCallbackFiresOnlyForAChild(t *testing.T) {
 
 	childSpy := newSpyInspector()
 	child.Inspect(childSpy.inspector())
-	assert.Equal(t, []*dingo.Injector{root.Injector}, childSpy.parents)
+	require.Len(t, childSpy.parents, 1)
+	assert.Same(t, root.Injector, childSpy.parents[0])
 
 	grandchildSpy := newSpyInspector()
 	grandchild.Inspect(grandchildSpy.inspector())
-	assert.Equal(t, []*dingo.Injector{child.Injector}, grandchildSpy.parents)
+	require.Len(t, grandchildSpy.parents, 1)
+	assert.Same(t, child.Injector, grandchildSpy.parents[0])
 }
 
 func TestInspect_NilCallbacksAreSkipped(t *testing.T) {
@@ -218,7 +216,7 @@ func TestInspect_NilCallbacksAreSkipped(t *testing.T) {
 		},
 	})
 
-	assert.Contains(t, inspected, typeOf[greeter]())
+	assert.Contains(t, inspected, reflect.TypeFor[greeter]())
 
 	assert.NotPanics(t, func() {
 		injector.Inspect(dingo.Inspector{})
@@ -237,23 +235,23 @@ func TestInspect_ProviderAndInstanceAreNilWhenAbsent(t *testing.T) {
 	spy := newSpyInspector()
 	injector.Inspect(spy.inspector())
 
-	targetless := spy.bindings[typeOf[counter]()]
+	targetless := spy.bindings[reflect.TypeFor[counter]()]
 	require.Len(t, targetless, 1)
 	assert.Nil(t, targetless[0].to)
 	assert.Nil(t, targetless[0].provider)
 	assert.Nil(t, targetless[0].instance)
 
-	toOnly := spy.bindings[typeOf[greeter]()]
+	toOnly := spy.bindings[reflect.TypeFor[greeter]()]
 	require.Len(t, toOnly, 1)
 	assert.Nil(t, toOnly[0].provider)
 	assert.Nil(t, toOnly[0].instance)
 
-	instanceOnly := spy.bindings[typeOf[string]()]
+	instanceOnly := spy.bindings[reflect.TypeFor[string]()]
 	require.Len(t, instanceOnly, 1)
 	assert.Nil(t, instanceOnly[0].provider)
 	assert.NotNil(t, instanceOnly[0].instance)
 
-	providerOnly := spy.bindings[typeOf[int]()]
+	providerOnly := spy.bindings[reflect.TypeFor[int]()]
 	require.Len(t, providerOnly, 1)
 	assert.NotNil(t, providerOnly[0].provider)
 	assert.Nil(t, providerOnly[0].instance)

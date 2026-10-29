@@ -16,16 +16,13 @@ type greetingField struct {
 // what the object held at that moment.
 type requestingModule struct {
 	target          *greetingField
+	requestErr      error
 	seenInConfigure string
 }
 
 func (m *requestingModule) Configure(injector *dingo.Injector) {
 	m.target = new(greetingField)
-
-	if err := injector.RequestInjection(m.target); err != nil {
-		panic(err)
-	}
-
+	m.requestErr = injector.RequestInjection(m.target)
 	m.seenInConfigure = m.target.Greeting
 }
 
@@ -45,9 +42,9 @@ type unresolvableField struct {
 type queuingFailureModule struct{}
 
 func (queuingFailureModule) Configure(injector *dingo.Injector) {
-	if err := injector.RequestInjection(new(unresolvableField)); err != nil {
-		panic(err)
-	}
+	// The request is queued during Configure, so the error comes from
+	// InitModules instead.
+	_ = injector.RequestInjection(new(unresolvableField))
 }
 
 func TestRequestInjection_DelayedDuringConfigureRunsAfterAllModules(t *testing.T) {
@@ -57,6 +54,7 @@ func TestRequestInjection_DelayedDuringConfigureRunsAfterAllModules(t *testing.T
 
 	newInjector(t, module, greetingModule{})
 
+	require.NoError(t, module.requestErr)
 	assert.Empty(t, module.seenInConfigure)
 	assert.Equal(t, "hello", module.target.Greeting)
 }
