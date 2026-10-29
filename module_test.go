@@ -325,3 +325,87 @@ func TestWithInjector(t *testing.T) {
 	err = injector.InitModules(modules...)
 	assert.NoError(t, err)
 }
+
+type (
+	expandModuleBase   struct{}
+	expandModuleMiddle struct{}
+	expandModuleTop    struct{}
+	expandModuleCycleA struct{}
+	expandModuleCycleB struct{}
+)
+
+func (*expandModuleBase) Configure(*Injector) {}
+
+func (*expandModuleMiddle) Configure(*Injector) {}
+
+func (*expandModuleMiddle) Depends() []Module { return []Module{new(expandModuleBase)} }
+
+func (*expandModuleTop) Configure(*Injector) {}
+
+func (*expandModuleTop) Depends() []Module {
+	return []Module{new(expandModuleMiddle), new(expandModuleBase)}
+}
+
+func (*expandModuleCycleA) Configure(*Injector) {}
+
+func (*expandModuleCycleA) Depends() []Module { return []Module{new(expandModuleCycleB)} }
+
+func (*expandModuleCycleB) Configure(*Injector) {}
+
+func (*expandModuleCycleB) Depends() []Module { return []Module{new(expandModuleCycleA)} }
+
+func TestExpandModules(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns dependencies before dependents", func(t *testing.T) {
+		t.Parallel()
+
+		modules, err := ExpandModules(new(expandModuleTop))
+
+		require.NoError(t, err)
+		assert.Equal(t, []Module{
+			new(expandModuleBase),
+			new(expandModuleMiddle),
+			new(expandModuleTop),
+		}, modules)
+	})
+
+	t.Run("keeps input order for independent modules and deduplicates", func(t *testing.T) {
+		t.Parallel()
+
+		modules, err := ExpandModules(
+			new(expandModuleTop),
+			new(expandModuleBase),
+			new(expandModuleTop),
+		)
+
+		require.NoError(t, err)
+		assert.Equal(t, []Module{
+			new(expandModuleBase),
+			new(expandModuleMiddle),
+			new(expandModuleTop),
+		}, modules)
+	})
+
+	t.Run("is stable when dependency identities are stable", func(t *testing.T) {
+		t.Parallel()
+
+		once, err := ExpandModules(new(expandModuleTop))
+		require.NoError(t, err)
+
+		twice, err := ExpandModules(once...)
+		require.NoError(t, err)
+
+		assert.Equal(t, once, twice)
+	})
+
+	t.Run("reports cycles with ErrModuleCycle", func(t *testing.T) {
+		t.Parallel()
+
+		modules, err := ExpandModules(new(expandModuleCycleA))
+
+		assert.Nil(t, modules)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrModuleCycle)
+	})
+}

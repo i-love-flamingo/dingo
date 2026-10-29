@@ -65,14 +65,25 @@ func (f ModuleFunc) Configure(injector *Injector) {
 }
 
 // TryModule tests if modules are properly bound
-func TryModule(modules ...Module) (resultingError error) {
+func TryModule(modules ...Module) error {
+	return tryModules("TryModule", modules, (*Injector).InitModules)
+}
+
+// TryExpandedModules tests bindings in the supplied module list without calling
+// Depends or building eager singletons. Configuration panics become errors.
+func TryExpandedModules(modules ...Module) error {
+	return tryModules("TryExpandedModules", modules, (*Injector).InitExpandedModules)
+}
+
+func tryModules(name string, modules []Module, initialize func(*Injector, ...Module) error) (resultingError error) {
 	defer func() {
 		if err := recover(); err != nil {
 			if err, ok := err.(error); ok {
 				resultingError = err
 				return
 			}
-			resultingError = fmt.Errorf("dingo.TryModule panic: %q", err)
+
+			resultingError = fmt.Errorf("dingo.%s panic: %q", name, err) //nolint:err113 // preserve the existing panic diagnostic
 		}
 	}()
 
@@ -81,7 +92,8 @@ func TryModule(modules ...Module) (resultingError error) {
 		return err
 	}
 	injector.buildEagerSingletons = false
-	return injector.InitModules(modules...)
+
+	return initialize(injector, modules...)
 }
 
 // newModuleGraph returns an empty module dependency graph.
@@ -94,6 +106,33 @@ func newModuleGraph() *modGraph {
 	}
 
 	return mg
+}
+
+// ExpandModules expands modules and their transitive Depends() dependencies
+// and returns them in initialization order: every dependency appears before
+// the modules that depend on it, and modules that are independent of each
+// other keep their input order.
+//
+// Modules are deduplicated by identity: their reflect.Type, or the wrapped
+// func value for ModuleFunc — distinct closures count as distinct modules.
+// The first occurrence wins. The input slice is not modified.
+//
+// Re-expansion keeps the same modules and order when Depends returns stable
+// dependency identities. Fresh closures can add new modules on each expansion.
+// Use InitExpandedModules to initialize this exact list without calling Depends
+// again, for example after collecting configuration from the expanded modules.
+//
+// A cyclic dependency is reported as an error wrapping ErrModuleCycle,
+// with the cycle's module names; other sorting failures wrap ErrModuleSort.
+// Depends() is called once per distinct module during the call.
+func ExpandModules(modules ...Module) ([]Module, error) {
+	mg := newModuleGraph()
+
+	if err := mg.Add(modules...); err != nil {
+		return nil, err
+	}
+
+	return mg.Sort()
 }
 
 // Add adds each module and its transitive dependencies to the graph.
@@ -196,6 +235,10 @@ func (mg *modGraph) addModule(order int, module Module) (int64, error) {
 			depID, err := mg.addModule(order, dep)
 			if err != nil {
 				return 0, fmt.Errorf("could not add module: %w", err)
+			}
+
+			if depID == newNode.ID() {
+				return 0, fmt.Errorf("%w: %s", ErrModuleCycle, moduleName(module))
 			}
 
 			depNode := mg.Node(depID)
