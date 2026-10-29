@@ -247,7 +247,9 @@ func (injector *Injector) findBindingForAnnotatedType(t reflect.Type, annotation
 
 	// inject one key of a map-binding
 	if len(annotation) > 4 && annotation[:4] == "map:" {
-		return injector.mapbindings[t][annotation[4:]]
+		if binding := injector.mapbindings[t][annotation[4:]]; binding != nil {
+			return binding
+		}
 	}
 
 	// ask parent

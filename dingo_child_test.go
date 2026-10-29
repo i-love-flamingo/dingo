@@ -46,3 +46,26 @@ func TestChild(t *testing.T) {
 
 	assert.NotNil(t, i.(childParentIface).child())
 }
+
+func TestChildMapBindingFromParent(t *testing.T) {
+	t.Parallel()
+
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+	injector.BindMap(new(string), "key").ToInstance("parent")
+	assert.NoError(t, injector.InitModules())
+
+	child, err := injector.Child()
+	assert.NoError(t, err)
+	assert.NoError(t, child.InitModules())
+
+	i, err := child.GetAnnotatedInstance(new(string), "map:key")
+	assert.NoError(t, err)
+	assert.Equal(t, "parent", i)
+
+	var target struct {
+		Value string `inject:"map:key"`
+	}
+	assert.NoError(t, child.RequestInjection(&target))
+	assert.Equal(t, "parent", target.Value)
+}
