@@ -60,7 +60,7 @@ func TestChild_LocalBindingShadowsParentBinding(t *testing.T) {
 	assert.Equal(t, "hello", fromSibling.(greeter).Greet())
 }
 
-func TestInjection_InjectorSelfBindingReturnsCurrentInjector(t *testing.T) {
+func TestChild_InjectorSelfBindingReturnsCurrentInjector(t *testing.T) {
 	t.Parallel()
 
 	parent := newInjector(t)

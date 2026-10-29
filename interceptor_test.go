@@ -20,6 +20,13 @@ type (
 	whisperingGreeter struct {
 		Wrapped greeter
 	}
+
+	// twoFieldGreeter has a second field of the intercepted type, so a write
+	// by field name or into the last matching field misses field 0.
+	twoFieldGreeter struct {
+		Base    greeter
+		Wrapped greeter
+	}
 )
 
 func (g *exclaimingGreeter) Greet() string {
@@ -30,20 +37,24 @@ func (g *whisperingGreeter) Greet() string {
 	return g.Wrapped.Greet() + "..."
 }
 
+func (g *twoFieldGreeter) Greet() string {
+	return g.Base.Greet()
+}
+
 func TestInterceptor_Field0ReceivesTheBaseValuePositionally(t *testing.T) {
 	t.Parallel()
 
 	injector := newInjector(t)
 	injector.Bind(new(greeter)).To(helloGreeter{})
-	injector.BindInterceptor(new(greeter), exclaimingGreeter{})
+	injector.BindInterceptor(new(greeter), twoFieldGreeter{})
 
 	resolved, err := injector.GetInstance(new(greeter))
 	require.NoError(t, err)
 
-	wrapper, ok := resolved.(*exclaimingGreeter)
+	wrapper, ok := resolved.(*twoFieldGreeter)
 	require.True(t, ok)
-	assert.IsType(t, new(helloGreeter), wrapper.Wrapped)
-	assert.Equal(t, "hello!", wrapper.Greet())
+	assert.IsType(t, new(helloGreeter), wrapper.Base)
+	assert.Nil(t, wrapper.Wrapped)
 }
 
 func TestInterceptor_ReWrapsOnEveryResolutionEvenWithASingletonBase(t *testing.T) {
@@ -72,7 +83,7 @@ func TestInterceptor_ReWrapsOnEveryResolutionEvenWithASingletonBase(t *testing.T
 	assert.Same(t, firstWrapper.Wrapped, secondWrapper.Wrapped)
 }
 
-func TestChild_InterceptorsInheritedFromParentUnconditionally(t *testing.T) {
+func TestInterceptor_ParentInterceptorsWrapOutsideChildInterceptors(t *testing.T) {
 	t.Parallel()
 
 	// Observed behavior, not a guarantee: a parent's interceptors always wrap
@@ -94,7 +105,7 @@ func TestChild_InterceptorsInheritedFromParentUnconditionally(t *testing.T) {
 	assert.Equal(t, "hello...!", fromChild.(greeter).Greet())
 }
 
-func TestInterceptor_AppliesAcrossChildBoundary(t *testing.T) {
+func TestInterceptor_ParentInterceptorsApplyWhenChildHasNone(t *testing.T) {
 	t.Parallel()
 
 	parent := newInjector(t)
