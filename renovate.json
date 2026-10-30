@@ -1,12 +1,18 @@
 {
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:base",
+    "config:recommended",
     ":semanticCommitTypeAll(chore)"
   ],
-  "regexManagers": [
+  "constraintsFiltering": "strict",
+  "customManagers": [
     {
+      "customType": "regex",
       "description": "Update go run/go install dependencies",
-      "fileMatch": [".*\\.go$", "Makefile"],
+      "managerFilePatterns": [
+        "/.*\\.go$/",
+        "/Makefile/"
+      ],
       "matchStrings": [
         "\\s*go (run|install) (?<depName>([^@]+)?).*@(?<currentValue>[^\\s]+)"
       ],
