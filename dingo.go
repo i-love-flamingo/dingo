@@ -70,9 +70,11 @@ type (
 	}
 
 	circularTraceEntry struct {
-		typ        reflect.Type
-		annotation string
-		active     *atomic.Bool
+		typ         reflect.Type
+		annotation  string
+		active      *atomic.Bool
+		viaProvider bool  // reached this branch through a generated provider call
+		scope       Scope // the locking scope of a scoped resolution, nil for a construction
 	}
 )
 
@@ -235,8 +237,13 @@ func (injector *Injector) SetBuildEagerSingletons(build bool) {
 // EnableCircularTracing activates tracing of circular dependencies for this injector.
 // This is super expensive (memory wise), so it should only be used for debugging purposes.
 // Generated providers inherit constructions that are still active when called,
-// including overlapping calls from other goroutines. Finished constructions are
-// ignored, so deferred calls start a new trace once their origin has finished.
+// including overlapping calls from other goroutines. A type, singleton or child
+// singleton that repeats with no provider call in between is reported at once.
+// A construction repeated through provider calls is reported on the 17th repeat
+// in one chain. A singleton reached again through a provider call is only
+// logged, because another goroutine may rightly wait for it; on the same
+// goroutine this hangs. Finished constructions are ignored, so deferred calls
+// start a new trace once their origin has finished.
 func (injector *Injector) EnableCircularTracing() {
 	injector.circularTracing = true
 }

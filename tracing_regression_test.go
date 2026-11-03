@@ -1,6 +1,7 @@
 package dingo_test
 
 import (
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"flamingo.me/dingo"
 )
 
-const traceRecursionLimit = 8
+const traceRecursionLimit = 32
 
 type (
 	traceService           interface{ Origin() *traceOrigin }
@@ -122,7 +123,7 @@ func TestTracingDetectsSynchronousProviderCycles(t *testing.T) {
 
 			got := tracePanic(func() { _, _ = child.GetInstance(new(traceOrigin)) })
 			require.Equal(t, "detected circular dependency", got)
-			require.EqualValues(t, 1, config.calls.Load())
+			require.EqualValues(t, dingo.ProviderReentryLimit+1, config.calls.Load())
 		})
 	}
 }
@@ -237,7 +238,7 @@ func TestTracingCanBeEnabledAfterProviderSynthesis(t *testing.T) {
 	}
 }
 
-func TestTracingOverlappingProviderInheritsLiveOrigin(t *testing.T) {
+func TestTracingDetectsUnboundedCycleAcrossGoroutines(t *testing.T) {
 	t.Parallel()
 
 	config := &traceConfig{onOrigin: func(providers *traceProviders) {
@@ -251,7 +252,7 @@ func TestTracingOverlappingProviderInheritsLiveOrigin(t *testing.T) {
 	injector := traceInjector(t, config)
 	injector.EnableCircularTracing()
 	require.Equal(t, "detected circular dependency", tracePanic(func() { _, _ = injector.GetInstance(new(traceOrigin)) }))
-	require.EqualValues(t, 1, config.calls.Load())
+	require.EqualValues(t, dingo.ProviderReentryLimit+1, config.calls.Load())
 }
 
 func traceReceive[T any](t *testing.T, channel <-chan T) T {
@@ -455,4 +456,384 @@ func TestTracingDeferredParentProviderRetainsEnabledTrace(t *testing.T) {
 	interceptor := instance.(*traceInterceptedOrigin).Service.(*traceSavedInterceptor)
 
 	require.Equal(t, "detected circular dependency", tracePanic(func() { interceptor.Make() }))
+}
+
+type (
+	overlapRoot struct {
+		X    *overlapX    `inject:""`
+		Slow *overlapSlow `inject:""`
+	}
+	overlapX struct {
+		TP overlapTProvider `inject:""`
+	}
+	overlapTProvider func() *overlapT
+	overlapT         struct {
+		Root *overlapRoot `inject:""`
+	}
+	overlapSlow struct{}
+	overlapGate struct {
+		first   atomic.Bool
+		entered chan struct{}
+		release chan struct{}
+	}
+)
+
+func (*overlapSlow) Inject(gate *overlapGate) {
+	if gate.first.CompareAndSwap(false, true) {
+		gate.entered <- struct{}{}
+
+		<-gate.release
+	}
+}
+
+func TestTracingOverlappingProviderCallIsNotACycle(t *testing.T) {
+	t.Parallel()
+
+	for name, scope := range map[string]dingo.Scope{
+		"unscoped root":        nil,
+		"singleton root":       dingo.NewSingletonScope(),
+		"child singleton root": dingo.NewChildSingletonScope(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			injector, err := dingo.NewInjector()
+			require.NoError(t, err)
+			injector.BindScope(dingo.NewSingletonScope())
+			injector.EnableCircularTracing()
+
+			gate := &overlapGate{entered: make(chan struct{}, 1), release: make(chan struct{})}
+			injector.Bind(new(overlapGate)).ToInstance(gate)
+			injector.Bind(new(overlapX)).In(dingo.Singleton)
+
+			if scope != nil {
+				injector.BindScope(scope)
+				injector.Bind(new(overlapRoot)).In(scope)
+			}
+
+			errs := make(chan error, 1)
+
+			go func() {
+				_, err := injector.GetInstance(new(overlapRoot))
+				errs <- err
+			}()
+
+			traceReceive(t, gate.entered)
+
+			instance, err := injector.GetInstance(new(overlapX))
+			require.NoError(t, err)
+
+			// A scoped root makes the call wait until the root is built.
+			results := make(chan any, 1)
+
+			go func() {
+				results <- tracePanic(func() {
+					if instance.(*overlapX).TP().Root == nil {
+						panic("missing root")
+					}
+				})
+			}()
+
+			time.Sleep(20 * time.Millisecond)
+			close(gate.release)
+			require.Nil(t, traceReceive(t, results))
+			require.NoError(t, traceReceive(t, errs))
+		})
+	}
+}
+
+type (
+	crowdRoot struct {
+		X       *crowdX       `inject:""`
+		Slow    *overlapSlow  `inject:""`
+		Barrier *crowdBarrier `inject:""`
+	}
+	crowdX struct {
+		TP crowdTProvider `inject:""`
+	}
+	crowdTProvider func() *crowdT
+	crowdT         struct {
+		Root *crowdRoot `inject:""`
+	}
+	crowdBarrier struct{}
+	crowdGate    struct {
+		callers int32
+		arrived atomic.Int32
+		all     chan struct{}
+	}
+)
+
+// Inject keeps every nested root open until all callers have one.
+func (*crowdBarrier) Inject(gate *crowdGate, slow *overlapGate) {
+	if !slow.first.Load() {
+		return
+	}
+
+	if gate.arrived.Add(1) == gate.callers {
+		close(gate.all)
+	}
+
+	select {
+	case <-gate.all:
+	case <-time.After(5 * time.Second):
+	}
+}
+
+func TestTracingManyOverlappingProviderCallsAreNotACycle(t *testing.T) {
+	t.Parallel()
+
+	injector, err := dingo.NewInjector()
+	require.NoError(t, err)
+	injector.BindScope(dingo.NewSingletonScope())
+	injector.EnableCircularTracing()
+
+	callers := 2 * dingo.ProviderReentryLimit
+	slow := &overlapGate{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	gate := &crowdGate{callers: int32(callers), all: make(chan struct{})}
+
+	injector.Bind(new(overlapGate)).ToInstance(slow)
+	injector.Bind(new(crowdGate)).ToInstance(gate)
+	injector.Bind(new(crowdX)).In(dingo.Singleton)
+
+	errs := make(chan error, 1)
+
+	go func() {
+		_, err := injector.GetInstance(new(crowdRoot))
+		errs <- err
+	}()
+
+	traceReceive(t, slow.entered)
+
+	instance, err := injector.GetInstance(new(crowdX))
+	require.NoError(t, err)
+
+	results := make(chan any, callers)
+	for range callers {
+		go func() { results <- tracePanic(func() { instance.(*crowdX).TP() }) }()
+	}
+
+	for range callers {
+		require.Nil(t, traceReceive(t, results))
+	}
+
+	close(slow.release)
+	require.NoError(t, traceReceive(t, errs))
+}
+
+type (
+	twoScopesI    interface{}
+	twoScopesJ    interface{}
+	twoScopesK    interface{}
+	twoScopesPeer interface{}
+	twoScopesA    struct {
+		Peer twoScopesPeer `inject:",optional"`
+	}
+	twoScopesLink struct {
+		J twoScopesJ `inject:""`
+	}
+)
+
+func TestTracingTellsScopesApart(t *testing.T) {
+	t.Parallel()
+
+	injector, err := dingo.NewInjector()
+	require.NoError(t, err)
+
+	singleton := dingo.NewSingletonScope()
+	injector.BindScope(singleton)
+	injector.EnableCircularTracing()
+	injector.Bind(new(twoScopesI)).To(twoScopesA{}).In(dingo.ChildSingleton)
+	injector.Bind(new(twoScopesJ)).To(twoScopesA{}).In(dingo.Singleton)
+	injector.Bind(new(twoScopesK)).To(twoScopesA{}).In(dingo.Singleton)
+
+	// The singleton A is built first, through K and without a peer.
+	_, err = injector.GetInstance(new(twoScopesK))
+	require.NoError(t, err)
+
+	child, err := injector.Child()
+	require.NoError(t, err)
+	child.BindScope(singleton)
+	child.Bind(new(twoScopesPeer)).To(twoScopesLink{})
+
+	// The child singleton A reaches the cached singleton A through its peer and J.
+	require.Nil(t, tracePanic(func() {
+		_, err := child.GetInstance(new(twoScopesI))
+		require.NoError(t, err)
+	}))
+}
+
+// passScope is a custom scope that takes no lock.
+type passScope struct{}
+
+func (passScope) ResolveType(t reflect.Type, annotation string, unscoped func(reflect.Type, string, bool) (reflect.Value, error)) (reflect.Value, error) {
+	return unscoped(t, annotation, false)
+}
+
+type (
+	revX struct {
+		Y *revY `inject:""`
+	}
+	revY         struct{}
+	revXProvider func() *revX
+)
+
+func TestTracingAllowsBoundedProviderReentry(t *testing.T) {
+	t.Parallel()
+
+	for name, test := range map[string]struct {
+		depth  int
+		scope  dingo.Scope
+		panics bool
+	}{
+		"depth 1":                      {depth: 1},
+		"at limit":                     {depth: dingo.ProviderReentryLimit},
+		"above limit":                  {depth: dingo.ProviderReentryLimit + 1, panics: true},
+		"depth 1 in a lock-free scope": {depth: 1, scope: passScope{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			injector, err := dingo.NewInjector()
+			require.NoError(t, err)
+			injector.EnableCircularTracing()
+
+			depth := 0
+
+			binding := injector.Bind(new(revY)).ToProvider(func(xp revXProvider) *revY {
+				if depth < test.depth {
+					depth++
+
+					xp()
+				}
+
+				return &revY{}
+			})
+			if test.scope != nil {
+				injector.BindScope(test.scope)
+				binding.In(test.scope)
+			}
+
+			got := tracePanic(func() {
+				_, err := injector.GetInstance(new(revX))
+				require.NoError(t, err)
+			})
+			if test.panics {
+				require.Equal(t, "detected circular dependency", got)
+			} else {
+				require.Nil(t, got)
+				require.Equal(t, test.depth, depth)
+			}
+		})
+	}
+}
+
+type (
+	scopedCycleCount struct{ calls atomic.Int32 }
+	scopedCycleA     struct {
+		B *scopedCycleB `inject:""`
+	}
+	scopedCycleB struct{}
+)
+
+func (count *scopedCycleCount) guard() {
+	if count.calls.Add(1) > traceRecursionLimit {
+		panic("recursion guard")
+	}
+}
+
+func (*scopedCycleB) Inject(a *scopedCycleA, count *scopedCycleCount) {
+	count.guard()
+}
+
+func TestTracingReportsDirectScopedCycle(t *testing.T) {
+	t.Parallel()
+
+	for name, scope := range map[string]dingo.Scope{
+		"singleton":       dingo.NewSingletonScope(),
+		"child singleton": dingo.NewChildSingletonScope(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			injector, err := dingo.NewInjector()
+			require.NoError(t, err)
+			injector.BindScope(scope)
+			injector.EnableCircularTracing()
+
+			count := &scopedCycleCount{}
+			injector.Bind(new(scopedCycleCount)).ToInstance(count)
+			injector.Bind(new(scopedCycleA)).In(scope)
+
+			// A missed cycle blocks forever on the scope lock, so it runs apart.
+			results := make(chan any, 1)
+
+			go func() { results <- tracePanic(func() { _, _ = injector.GetInstance(new(scopedCycleA)) }) }()
+
+			require.Equal(t, "detected circular dependency", traceReceive(t, results))
+			require.EqualValues(t, 0, count.calls.Load())
+		})
+	}
+}
+
+type (
+	heldRoot struct {
+		Holder *heldHolder `inject:""`
+		Caller *heldCaller `inject:""`
+	}
+	heldHolder struct {
+		Make heldTailProvider `inject:""`
+	}
+	heldTailProvider func() *heldTail
+	heldTail         struct {
+		Root *heldRoot `inject:""`
+	}
+	heldCaller struct{}
+)
+
+func (*heldCaller) Inject(holder *heldHolder, count *scopedCycleCount) {
+	count.guard()
+	holder.Make()
+}
+
+// A provider keeps the ancestry it was created with. A cycle that keeps calling
+// one long-lived provider looks like overlapping calls, so it is not reported.
+func TestTracingMissesCycleThroughLongLivedProvider(t *testing.T) {
+	t.Parallel()
+
+	injector, err := dingo.NewInjector()
+	require.NoError(t, err)
+	injector.BindScope(dingo.NewSingletonScope())
+	injector.EnableCircularTracing()
+
+	count := &scopedCycleCount{}
+	injector.Bind(new(scopedCycleCount)).ToInstance(count)
+	injector.Bind(new(heldHolder)).In(dingo.Singleton)
+
+	require.Equal(t, "recursion guard", tracePanic(func() { _, _ = injector.GetInstance(new(heldRoot)) }))
+}
+
+func TestTracingSequentialProviderReentriesDoNotAddUp(t *testing.T) {
+	t.Parallel()
+
+	injector, err := dingo.NewInjector()
+	require.NoError(t, err)
+	injector.EnableCircularTracing()
+
+	calls := 0
+
+	injector.Bind(new(revY)).ToProvider(func(xp revXProvider) *revY {
+		if calls == 0 {
+			for range 2 * dingo.ProviderReentryLimit {
+				calls++
+
+				xp()
+			}
+		}
+
+		return &revY{}
+	})
+
+	_, err = injector.GetInstance(new(revX))
+	require.NoError(t, err)
+	require.Equal(t, 2*dingo.ProviderReentryLimit, calls)
 }

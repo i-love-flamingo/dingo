@@ -65,10 +65,8 @@ func (injector *Injector) getInstanceOfTypeWithAnnotation(typ reflect.Type, anno
 	if binding != nil {
 		if binding.scope != nil {
 			if scope, ok := injector.scopes[reflect.TypeOf(binding.scope)]; ok {
-				if final, err = scope.ResolveType(typ, annotation, func(requested reflect.Type, annotation string, optional bool) (reflect.Value, error) {
-					return injector.createInstanceOfAnnotatedType(requested, annotation, optional, circularTrace)
-				}); err != nil {
-					return reflect.Value{}, err //nolint:wrapcheck // scope errors pass through unchanged
+				if final, err = injector.resolveInScope(scope, typ, annotation, circularTrace); err != nil {
+					return reflect.Value{}, err
 				}
 
 				if !final.IsValid() {
@@ -91,6 +89,23 @@ func (injector *Injector) getInstanceOfTypeWithAnnotation(typ reflect.Type, anno
 	}
 
 	return injector.intercept(final, typ, circularTrace)
+}
+
+// resolveInScope resolves a type through its scope. With tracing on, it records
+// a resolution in a singleton scope first, so a cycle is reported before the
+// scope blocks on its own lock.
+func (injector *Injector) resolveInScope(scope Scope, typ reflect.Type, annotation string, circularTrace []circularTraceEntry) (reflect.Value, error) {
+	if circularTrace != nil {
+		switch scope.(type) {
+		case *SingletonScope, *ChildSingletonScope:
+			circularTrace = startScopeTrace(circularTrace, scope, typ, annotation)
+			defer finishTrace(circularTrace)
+		}
+	}
+
+	return scope.ResolveType(typ, annotation, func(requested reflect.Type, annotation string, optional bool) (reflect.Value, error) { //nolint:wrapcheck // scope errors pass through unchanged
+		return injector.createInstanceOfAnnotatedType(requested, annotation, optional, circularTrace)
+	})
 }
 
 func (injector *Injector) intercept(final reflect.Value, typ reflect.Type, circularTrace []circularTraceEntry) (reflect.Value, error) {
@@ -186,7 +201,7 @@ func (injector *Injector) createInstanceOfAnnotatedType(typ reflect.Type, annota
 
 	if circularTrace != nil {
 		subCircularTrace := startConstructionTrace(circularTrace, typ, annotation)
-		defer subCircularTrace[len(subCircularTrace)-1].active.Store(false)
+		defer finishTrace(subCircularTrace)
 
 		instance := reflect.New(typ)
 
