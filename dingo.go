@@ -115,8 +115,9 @@ func (injector *Injector) Child() (*Injector, error) {
 	}
 
 	newInjector.parent = injector
-	newInjector.circularTracing = injector.circularTracing
-	newInjector.injectionTracing = injector.injectionTracing
+	// NewInjector applied the package defaults; a child also inherits what its parent enabled.
+	newInjector.circularTracing = newInjector.circularTracing || injector.circularTracing
+	newInjector.injectionTracing = newInjector.injectionTracing || injector.injectionTracing
 	newInjector.Bind(Injector{}).ToInstance(newInjector)
 	newInjector.BindScope(NewChildSingletonScope()) // bind a new child-singleton
 

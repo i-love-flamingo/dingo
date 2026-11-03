@@ -84,6 +84,32 @@ func TestTracingDefaultsSeedNewInjectors(t *testing.T) { //nolint:paralleltest /
 	assert.True(t, injector.circularTracing)
 }
 
+func TestChildPicksUpTracingDefaultsSetAfterItsParent(t *testing.T) { //nolint:paralleltest // mutates the package-level defaults
+	previousCircular := defaultCircularTracing.Load()
+	previousInjection := defaultInjectionTracing.Load()
+
+	defer func() {
+		defaultCircularTracing.Store(previousCircular)
+		defaultInjectionTracing.Store(previousInjection)
+	}()
+
+	defaultCircularTracing.Store(false)
+	defaultInjectionTracing.Store(false)
+
+	injector, err := NewInjector()
+	assert.NoError(t, err)
+
+	EnableCircularTracing()
+	EnableInjectionTracing()
+
+	child, err := injector.Child()
+	assert.NoError(t, err)
+	assert.False(t, injector.circularTracing)
+	assert.False(t, injector.injectionTracing)
+	assert.True(t, child.circularTracing)
+	assert.True(t, child.injectionTracing)
+}
+
 func TestChildInheritsTracingState(t *testing.T) {
 	t.Parallel()
 
