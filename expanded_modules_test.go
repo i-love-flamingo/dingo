@@ -207,6 +207,9 @@ func TestInitExpandedModulesFinalizesBindings(t *testing.T) {
 		calls := 0
 		injector, err := dingo.NewInjector()
 		require.NoError(t, err)
+		// dingo.Singleton is shared by every injector in the process, so a
+		// string cached by another test would skip the provider.
+		injector.BindScope(dingo.NewSingletonScope())
 		require.NoError(t, injector.InitExpandedModules(dingo.ModuleFunc(func(injector *dingo.Injector) {
 			injector.Bind(new(string)).ToProvider(func() string {
 				calls++
