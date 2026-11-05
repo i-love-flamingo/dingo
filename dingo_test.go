@@ -1,6 +1,7 @@
 package dingo
 
 import (
+	"reflect"
 	"strconv"
 	"testing"
 
@@ -258,7 +259,44 @@ func TestOverrides(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "test2", s)
 	})
+
+	t.Run("pointer type", func(t *testing.T) {
+		t.Parallel()
+
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		injector.Bind(new(*overrideTarget)).ToInstance(&overrideTarget{name: "original"})
+		injector.Override(new(*overrideTarget), "").ToInstance(&overrideTarget{name: "override"})
+		assert.NoError(t, injector.InitModules())
+
+		i, err := injector.GetInstance(reflect.TypeFor[**overrideTarget]())
+		assert.NoError(t, err)
+		assert.Equal(t, "override", i.(*overrideTarget).name)
+	})
+
+	t.Run("pointer type with value type bound", func(t *testing.T) {
+		t.Parallel()
+
+		injector, err := NewInjector()
+		assert.NoError(t, err)
+
+		injector.Bind(new(overrideTarget)).ToInstance(overrideTarget{name: "value"})
+		injector.Bind(new(*overrideTarget)).ToInstance(&overrideTarget{name: "original"})
+		injector.Override(new(*overrideTarget), "").ToInstance(&overrideTarget{name: "override"})
+		assert.NoError(t, injector.InitModules())
+
+		i, err := injector.GetInstance(reflect.TypeFor[**overrideTarget]())
+		assert.NoError(t, err)
+		assert.Equal(t, "override", i.(*overrideTarget).name)
+
+		i, err = injector.GetInstance(new(overrideTarget))
+		assert.NoError(t, err)
+		assert.Equal(t, "value", i.(overrideTarget).name)
+	})
 }
+
+type overrideTarget struct{ name string }
 
 func TestProvider(t *testing.T) {
 	t.Run("Provider", func(t *testing.T) {
