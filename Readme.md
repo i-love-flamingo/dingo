@@ -63,6 +63,7 @@ func (module *BillingModule) Configure(injector *dingo.Injector) {
 ## Expanding modules before initialization
 
 `ExpandModules` returns modules and their dependencies in initialization order.
+A dependency comes right before the first module that pulls it in; otherwise the input order is kept.
 It keeps the first module of each ordinary type and treats distinct `ModuleFunc`
 closures as distinct modules. The returned modules retain their concrete types
 and optional interfaces, so callers can collect configuration before initialization.
@@ -509,7 +510,7 @@ This is similar to the `http` Packages `HandlerFunc` mechanism and allows to sav
 
 ## Troubleshooting
 
-Use `Injector.EnableCircularTracing()` to detect circular dependencies. Tracing uses extra memory and is intended for debugging. Generated providers retain only constructions that are still active when called. Once those constructions finish, deferred provider calls start an empty enabled trace.
+Use `Injector.EnableCircularTracing()` to detect circular dependencies. Call it on an injector from `NewInjector()` with no modules, then call `InitModules`; `NewInjector(modules...)` already injects modules and builds eager singletons before you could enable tracing. Tracing uses extra memory and is intended for debugging. Generated providers retain only constructions that are still active when called. Once those constructions finish, deferred provider calls start an empty enabled trace.
 
 A provider called while its origin is still being constructed inherits that active ancestry, including calls from another goroutine. A type that repeats in its own construction chain with no generated provider call in between is reported at once. So is a singleton or child singleton that repeats in the same scope while it is still being built, because it would wait for itself forever. A repeat through a provider call is allowed up to 16 times in one chain and reported on the 17th. This lets bounded recursion through providers work, and so do provider calls from other goroutines that overlap a running construction. A singleton reached again through a provider call is only logged, because another goroutine may rightly wait for it. Tracing cannot tell that wait from a call on the same goroutine, which hangs. A provider keeps the ancestry it was created with, so an endless cycle that keeps calling one long-lived provider (for example one held by a singleton) is not detected.
 

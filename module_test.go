@@ -332,6 +332,7 @@ type (
 	expandModuleTop    struct{}
 	expandModuleCycleA struct{}
 	expandModuleCycleB struct{}
+	expandModuleLone   struct{}
 )
 
 func (*expandModuleBase) Configure(*Injector) {}
@@ -354,6 +355,8 @@ func (*expandModuleCycleB) Configure(*Injector) {}
 
 func (*expandModuleCycleB) Depends() []Module { return []Module{new(expandModuleCycleA)} }
 
+func (*expandModuleLone) Configure(*Injector) {}
+
 func TestExpandModules(t *testing.T) {
 	t.Parallel()
 
@@ -370,7 +373,7 @@ func TestExpandModules(t *testing.T) {
 		}, modules)
 	})
 
-	t.Run("keeps input order for independent modules and deduplicates", func(t *testing.T) {
+	t.Run("keeps input order and deduplicates", func(t *testing.T) {
 		t.Parallel()
 
 		modules, err := ExpandModules(
@@ -384,6 +387,23 @@ func TestExpandModules(t *testing.T) {
 			new(expandModuleBase),
 			new(expandModuleMiddle),
 			new(expandModuleTop),
+		}, modules)
+	})
+
+	t.Run("places a pulled-in dependency before its first dependent", func(t *testing.T) {
+		t.Parallel()
+
+		modules, err := ExpandModules(
+			new(expandModuleMiddle),
+			new(expandModuleLone),
+			new(expandModuleBase),
+		)
+
+		require.NoError(t, err)
+		assert.Equal(t, []Module{
+			new(expandModuleBase),
+			new(expandModuleMiddle),
+			new(expandModuleLone),
 		}, modules)
 	})
 

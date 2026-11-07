@@ -30,7 +30,7 @@ var (
 //
 // Deprecated: sets the default for injectors created after this call; it does not
 // affect existing injectors. Prefer Injector.EnableCircularTracing, which scopes the
-// decision to one injector. Removal is planned for the next minor version.
+// decision to one injector; call it before InitModules, see its doc.
 func EnableCircularTracing() {
 	defaultCircularTracing.Store(true)
 }
@@ -39,7 +39,7 @@ func EnableCircularTracing() {
 //
 // Deprecated: sets the default for injectors created after this call; it does not
 // affect existing injectors. Prefer Injector.EnableInjectionTracing, which scopes the
-// decision to one injector. Removal is planned for the next minor version.
+// decision to one injector; call it before InitModules, see its doc.
 func EnableInjectionTracing() {
 	defaultInjectionTracing.Store(true)
 }
@@ -245,11 +245,19 @@ func (injector *Injector) SetBuildEagerSingletons(build bool) {
 // logged, because another goroutine may rightly wait for it; on the same
 // goroutine this hangs. Finished constructions are ignored, so deferred calls
 // start a new trace once their origin has finished.
+//
+// Call it on an injector from NewInjector() with no modules, before InitModules
+// or InitExpandedModules. NewInjector(modules...) already injects modules and
+// builds eager singletons, so enabling tracing afterwards misses them.
+// Like Bind, it is not safe to call while the injector resolves or creates children.
 func (injector *Injector) EnableCircularTracing() {
 	injector.circularTracing = true
 }
 
 // EnableInjectionTracing activates verbose logging of everything this injector injects.
+//
+// Call it before InitModules or InitExpandedModules, as with EnableCircularTracing.
+// Like Bind, it is not safe to call while the injector resolves or creates children.
 func (injector *Injector) EnableInjectionTracing() {
 	injector.injectionTracing = true
 }
