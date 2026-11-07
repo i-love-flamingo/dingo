@@ -246,9 +246,10 @@ func (injector *Injector) SetBuildEagerSingletons(build bool) {
 // goroutine this hangs. Finished constructions are ignored, so deferred calls
 // start a new trace once their origin has finished.
 //
-// Call it on an injector from NewInjector() with no modules, before InitModules
-// or InitExpandedModules. NewInjector(modules...) already injects modules and
-// builds eager singletons, so enabling tracing afterwards misses them.
+// Call it on an injector without modules (NewInjector() or Child()) before
+// InitModules or InitExpandedModules. NewInjector(modules...) already injects
+// modules and builds eager singletons, so enabling tracing afterwards misses
+// them. Children copy the setting when they are created.
 // Like Bind, it is not safe to call while the injector resolves or creates children.
 func (injector *Injector) EnableCircularTracing() {
 	injector.circularTracing = true

@@ -407,6 +407,22 @@ func TestExpandModules(t *testing.T) {
 		}, modules)
 	})
 
+	t.Run("keeps a dependency missing from the input after earlier modules", func(t *testing.T) {
+		t.Parallel()
+
+		modules, err := ExpandModules(
+			new(expandModuleLone),
+			new(expandModuleMiddle),
+		)
+
+		require.NoError(t, err)
+		assert.Equal(t, []Module{
+			new(expandModuleLone),
+			new(expandModuleBase),
+			new(expandModuleMiddle),
+		}, modules)
+	})
+
 	t.Run("is stable when dependency identities are stable", func(t *testing.T) {
 		t.Parallel()
 

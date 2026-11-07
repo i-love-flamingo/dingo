@@ -67,7 +67,7 @@ func startConstructionTrace(trace []circularTraceEntry, typ reflect.Type, annota
 		}
 
 		if repeats > providerReentryLimit {
-			slog.Info(fmt.Sprintf("%s#%s: %s repeated through providers more than %d times; finite but deeper recursion is reported too", typ.PkgPath(), typ.Name(), annotation, providerReentryLimit))
+			slog.Info(fmt.Sprintf("%s#%s: %s repeated through providers more than %d times; tracing reports this as a cycle even if the recursion would end", typ.PkgPath(), typ.Name(), annotation, providerReentryLimit))
 			reportCircular(trace[newest:], typ, annotation)
 		}
 	}

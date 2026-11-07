@@ -110,10 +110,10 @@ func newModuleGraph() *modGraph {
 
 // ExpandModules expands modules and their transitive Depends() dependencies
 // and returns them in initialization order: every dependency appears before
-// the modules that depend on it. A dependency that is not in the input is placed
-// right before the first input module that pulls it in, so it can come before
-// modules listed earlier. Otherwise the input order is kept. The order is
-// deterministic.
+// the modules that depend on it. Each module is placed right before the first
+// input module that pulls it in, even if it is also listed later in the input,
+// so it can come before modules listed in between. Otherwise the input order
+// is kept. The order is deterministic.
 //
 // Modules are deduplicated by identity: their reflect.Type, or the wrapped
 // func value for ModuleFunc — distinct closures count as distinct modules.
