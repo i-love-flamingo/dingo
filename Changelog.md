@@ -1,5 +1,22 @@
 # Changelog
 
+## Version v0.4.2 (2026-11-07)
+
+### Tests
+
+- cover scopes, inspection, overrides, and multibindings (#97) (b1621e40)
+
+### Ops and CI/CD
+
+- align job names and setup with the other repos (#102) (6b20add1)
+- scan dependencies with govulncheck (#101) (c3d02bae)
+
+### Chores and tidying
+
+- **deps:** update dependency golangci/golangci-lint to v2.15.0 (#105) (f27bd278)
+- require go 1.26.0 (#100) (037af0cf)
+- **deps:** update dependency golangci/golangci-lint to v2.14.0 (#98) (a7ec18a1)
+
 ## Version v0.4.1 (2026-09-02)
 
 ### Fixes
