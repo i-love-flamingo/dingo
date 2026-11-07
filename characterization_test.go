@@ -419,6 +419,8 @@ func TestCharacterizationScopesAndParents(t *testing.T) {
 
 		calls := 0
 		module := dingo.ModuleFunc(func(injector *dingo.Injector) {
+			// AsEagerSingleton uses the shared Singleton scope; a fresh one keeps repeated runs independent.
+			injector.BindScope(dingo.NewSingletonScope())
 			injector.Bind(new(charPlain)).ToProvider(func() *charPlain {
 				calls++
 				return &charPlain{}
