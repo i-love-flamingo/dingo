@@ -60,6 +60,34 @@ func (module *BillingModule) Configure(injector *dingo.Injector) {
 }
 ```
 
+## Expanding modules before initialization
+
+`ExpandModules` returns modules and their dependencies in initialization order.
+A dependency comes right before the first module that pulls it in; otherwise the input order is kept.
+It keeps the first module of each ordinary type and treats distinct `ModuleFunc`
+closures as distinct modules. The returned modules retain their concrete types
+and optional interfaces, so callers can collect configuration before initialization.
+
+Initialize the exact list with `InitExpandedModules`. It keeps the supplied order,
+deduplicates by the same identities, and does not call `Depends` again:
+
+```go
+modules, err := dingo.ExpandModules(applicationModules...)
+if err != nil {
+	return err
+}
+injector, err := dingo.NewInjector()
+if err != nil {
+	return err
+}
+return injector.InitExpandedModules(modules...)
+```
+
+`InitModules` and `TryModule` still expand dependencies. Repeated expansion is
+stable when `Depends` returns the same dependency identities; fresh closures can
+add new modules on each call. `TryExpandedModules` checks the supplied list without
+re-expanding it, recovers configuration panics, and skips eager singleton construction.
+
 ## Requesting injection
 
 Every instance that is created through the container can use injection. 
@@ -481,5 +509,9 @@ Dingo has a wrapper for `func(*Injector)` called `ModuleFunc`. It is possible to
 This is similar to the `http` Packages `HandlerFunc` mechanism and allows to save code and easier set up small projects.
 
 ## Troubleshooting
-1. To trace possible circular injections Dingo has function `EnableCircularTracing()`, which also switches slog to DEBUG level. This makes execution very heavy in terms of memory, so should be used only for debug purposes.
-2. To trace possible injection issues, like when Dingo tries to inject dependency into unexported field and fails, and user does not know where this happens, Dingo has `EnableInjectionTracing()`, which is also sets slog level to DEBUG. 
+
+Use `Injector.EnableCircularTracing()` to detect circular dependencies. Call it on an injector from `NewInjector()` with no modules, then call `InitModules`; `NewInjector(modules...)` already injects modules and builds eager singletons before you could enable tracing. Tracing uses extra memory and is intended for debugging. Generated providers retain only constructions that are still active when called. Once those constructions finish, deferred provider calls start an empty enabled trace.
+
+A provider called while its origin is still being constructed inherits that active ancestry, including calls from another goroutine. A type that repeats in its own construction chain with no generated provider call in between is reported at once. So is a singleton or child singleton that repeats in the same scope while it is still being built, because it would wait for itself forever. A repeat through a provider call is allowed up to 16 times in one chain and reported on the 17th. This lets bounded recursion through providers work, and so do provider calls from other goroutines that overlap a running construction. A singleton reached again through a provider call is only logged, because another goroutine may rightly wait for it. Tracing cannot tell that wait from a call on the same goroutine, which hangs. A provider keeps the ancestry it was created with, so an endless cycle that keeps calling one long-lived provider (for example one held by a singleton) is not detected.
+
+Use `Injector.EnableInjectionTracing()` to log what an injector injects and which fields it sets. Neither tracing method changes the slog level. The deprecated package-level `EnableCircularTracing()` and `EnableInjectionTracing()` functions set defaults for injectors created after the call; they do not change existing injectors.
