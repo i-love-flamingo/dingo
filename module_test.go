@@ -35,7 +35,7 @@ func TestTryModule(t *testing.T) {
 }
 
 func TestResolveDependenciesWithModuleFunc(t *testing.T) {
-	var countInline, countExtern int
+	var markIntern, countExtern int
 
 	ext := ModuleFunc(func(injector *Injector) {
 		countExtern++
@@ -44,10 +44,10 @@ func TestResolveDependenciesWithModuleFunc(t *testing.T) {
 	injector, err := NewInjector(
 		new(tryModuleOk),
 		ModuleFunc(func(injector *Injector) {
-			countInline++
+			markIntern |= 1 << 1
 		}),
 		ModuleFunc(func(injector *Injector) {
-			countInline++
+			markIntern |= 1 << 2
 		}),
 		ext,
 		ext,
@@ -55,7 +55,7 @@ func TestResolveDependenciesWithModuleFunc(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, injector)
-	assert.Equal(t, 2, countInline, "inline modules should be called once (eventually twice for this test)")
+	assert.Equal(t, (1<<2)|(1<<1), markIntern, "inline modules should be called once (eventually twice for this test)")
 	assert.Equal(t, 1, countExtern, "variable defined modules should only be called once")
 }
 
