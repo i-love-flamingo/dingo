@@ -1,9 +1,6 @@
 package dingo_test
 
 import (
-	"bytes"
-	"log"
-	"log/slog"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -737,17 +734,7 @@ type revDirect struct {
 
 //nolint:paralleltest // Captures the process-wide slog logger.
 func TestTracingLogsReentryLimitHint(t *testing.T) {
-	var output bytes.Buffer
-
-	previousLogger, previousWriter, previousFlags := slog.Default(), log.Writer(), log.Flags()
-
-	slog.SetDefault(slog.New(slog.NewTextHandler(&output, nil)))
-	t.Cleanup(func() {
-		// SetDefault also redirects the log package; restore it too.
-		slog.SetDefault(previousLogger)
-		log.SetOutput(previousWriter)
-		log.SetFlags(previousFlags)
-	})
+	output := captureSlog(t)
 
 	const hint = "repeated through providers more than"
 
