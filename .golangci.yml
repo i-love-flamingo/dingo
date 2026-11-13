@@ -62,6 +62,12 @@ linters:
     - wrapcheck
     - wsl_v5
   settings:
+    forbidigo:
+      forbid:
+        # Setting forbid replaces the defaults, so keep the default print rule.
+        - pattern: ^(fmt\.Print(|f|ln)|print|println)$
+        - pattern: ^slog\.SetDefault$
+          msg: use captureSlog in tests; it also restores the log package output.
     mnd:
       ignored-functions:
         - context.WithTimeout
