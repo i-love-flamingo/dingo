@@ -1,0 +1,176 @@
+- inject_errors plain module-self-dependency=PANIC(simple: adding self edge)
++ inject_errors plain module-self-dependency=is-ErrInitModules=true is-ErrModuleCycle=true
+- inject_errors trace module-self-dependency=PANIC(simple: adding self edge)
++ inject_errors trace module-self-dependency=is-ErrInitModules=true is-ErrModuleCycle=true
++ inject_nil_values plain typed-nil-map-key-in-child=*releasediff_test.namedHandler nil=true
+- inject_nil_values plain typed-nil-map-key-in-child=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:nilptr")
++ inject_nil_values trace typed-nil-map-key-in-child=*releasediff_test.namedHandler nil=true
+- inject_nil_values trace typed-nil-map-key-in-child=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:nilptr")
++ map_annotated plain child.map:y=*releasediff_test.namedHandler{ann-y}
+- map_annotated plain child.map:y=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:y")
++ map_annotated trace child.map:y=*releasediff_test.namedHandler{ann-y}
+- map_annotated trace child.map:y=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:y")
+- map_key_factory_in_child plain child.map=ERR(injecting into flamingo.me/dingo/releasediff_test.<releasediff_test.oidcFactoryHolder Value>: / can not automatically create an annotated injection "releasediff_test.Factory" with annotation "map:oidc")
++ map_key_factory_in_child plain child.map=len=2 custom=*releasediff_test.namedHandler{custom(oidc:1)}
+- map_key_factory_in_child trace child.map=ERR(injecting into flamingo.me/dingo/releasediff_test.<releasediff_test.oidcFactoryHolder Value>: / can not automatically create an annotated injection "releasediff_test.Factory" with annotation "map:oidc")
++ map_key_factory_in_child trace child.map=len=2 custom=*releasediff_test.namedHandler{custom(oidc:1)}
++ map_key_field_in_child plain de.field=*releasediff_test.namedHandler{root-a}
+- map_key_field_in_child plain de.field=nil
+- map_key_field_in_child plain de.inject=ERR(injecting into flamingo.me/dingo/releasediff_test.<releasediff_test.mapKeyHolder Value>: / can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_field_in_child plain de.inject=ok
++ map_key_field_in_child plain fr.GetInstance(holder)=*releasediff_test.namedHandler{root-a}
+- map_key_field_in_child plain fr.GetInstance(holder)=ERR(injecting into flamingo.me/dingo/releasediff_test.<releasediff_test.mapKeyHolder Value>: / can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_field_in_child plain fr.field=*releasediff_test.namedHandler{root-a}
+- map_key_field_in_child plain fr.field=nil
+- map_key_field_in_child plain fr.inject=ERR(injecting into flamingo.me/dingo/releasediff_test.<releasediff_test.mapKeyHolder Value>: / can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_field_in_child plain fr.inject=ok
++ map_key_field_in_child trace de.field=*releasediff_test.namedHandler{root-a}
+- map_key_field_in_child trace de.field=nil
+- map_key_field_in_child trace de.inject=ERR(injecting into flamingo.me/dingo/releasediff_test.<releasediff_test.mapKeyHolder Value>: / can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_field_in_child trace de.inject=ok
++ map_key_field_in_child trace fr.GetInstance(holder)=*releasediff_test.namedHandler{root-a}
+- map_key_field_in_child trace fr.GetInstance(holder)=ERR(injecting into flamingo.me/dingo/releasediff_test.<releasediff_test.mapKeyHolder Value>: / can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_field_in_child trace fr.field=*releasediff_test.namedHandler{root-a}
+- map_key_field_in_child trace fr.field=nil
+- map_key_field_in_child trace fr.inject=ERR(injecting into flamingo.me/dingo/releasediff_test.<releasediff_test.mapKeyHolder Value>: / can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_field_in_child trace fr.inject=ok
++ map_key_optional_in_child plain fr.H=*releasediff_test.namedHandler{root-a}
+- map_key_optional_in_child plain fr.H=nil
++ map_key_optional_in_child plain fr.T=*releasediff_test.Target{target:root-t}
+- map_key_optional_in_child plain fr.T=*releasediff_test.Target{target:}
++ map_key_optional_in_child trace fr.H=*releasediff_test.namedHandler{root-a}
+- map_key_optional_in_child trace fr.H=nil
++ map_key_optional_in_child trace fr.T=*releasediff_test.Target{target:root-t}
+- map_key_optional_in_child trace fr.T=*releasediff_test.Target{target:}
++ map_key_per_area plain de.map:a=*releasediff_test.namedHandler{root-a}
+- map_key_per_area plain de.map:a=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_per_area plain de.map:site=*releasediff_test.siteHandler{site:de}
+- map_key_per_area plain de.map:site=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:site")
++ map_key_per_area plain de/sub.map:a=*releasediff_test.namedHandler{root-a}
+- map_key_per_area plain de/sub.map:a=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_per_area plain de/sub.map:b=*releasediff_test.namedHandler{de-b}
+- map_key_per_area plain de/sub.map:b=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:b")
++ map_key_per_area plain de/sub.map:c=*releasediff_test.namedHandler{de-c}
+- map_key_per_area plain de/sub.map:c=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:c")
++ map_key_per_area plain de/sub.map:site=*releasediff_test.siteHandler{site:de-sub}
+- map_key_per_area plain de/sub.map:site=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:site")
++ map_key_per_area plain fr.map:a=*releasediff_test.namedHandler{root-a}
+- map_key_per_area plain fr.map:a=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_per_area plain fr.map:b=*releasediff_test.namedHandler{root-b}
+- map_key_per_area plain fr.map:b=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:b")
++ map_key_per_area plain fr.map:site=*releasediff_test.siteHandler{site:fr}
+- map_key_per_area plain fr.map:site=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:site")
++ map_key_per_area trace de.map:a=*releasediff_test.namedHandler{root-a}
+- map_key_per_area trace de.map:a=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_per_area trace de.map:site=*releasediff_test.siteHandler{site:de}
+- map_key_per_area trace de.map:site=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:site")
++ map_key_per_area trace de/sub.map:a=*releasediff_test.namedHandler{root-a}
+- map_key_per_area trace de/sub.map:a=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_per_area trace de/sub.map:b=*releasediff_test.namedHandler{de-b}
+- map_key_per_area trace de/sub.map:b=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:b")
++ map_key_per_area trace de/sub.map:c=*releasediff_test.namedHandler{de-c}
+- map_key_per_area trace de/sub.map:c=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:c")
++ map_key_per_area trace de/sub.map:site=*releasediff_test.siteHandler{site:de-sub}
+- map_key_per_area trace de/sub.map:site=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:site")
++ map_key_per_area trace fr.map:a=*releasediff_test.namedHandler{root-a}
+- map_key_per_area trace fr.map:a=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_per_area trace fr.map:b=*releasediff_test.namedHandler{root-b}
+- map_key_per_area trace fr.map:b=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:b")
++ map_key_per_area trace fr.map:site=*releasediff_test.siteHandler{site:fr}
+- map_key_per_area trace fr.map:site=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:site")
++ map_key_regular_binding_precedence plain fr.map:p=*releasediff_test.namedHandler{root-regular-p}
+- map_key_regular_binding_precedence plain fr.map:p=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:p")
++ map_key_regular_binding_precedence plain fr.map:q=*releasediff_test.namedHandler{root-map-q}
+- map_key_regular_binding_precedence plain fr.map:q=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:q")
++ map_key_regular_binding_precedence trace fr.map:p=*releasediff_test.namedHandler{root-regular-p}
+- map_key_regular_binding_precedence trace fr.map:p=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:p")
++ map_key_regular_binding_precedence trace fr.map:q=*releasediff_test.namedHandler{root-map-q}
+- map_key_regular_binding_precedence trace fr.map:q=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:q")
++ map_key_scopes_in_child plain childsingle=root=*releasediff_test.countedHandler{counted#2} fr1=*releasediff_test.countedHandler{counted#3} fr2=*releasediff_test.countedHandler{counted#3} fr1-fr2=same root-fr=distinct
+- map_key_scopes_in_child plain childsingle=root=*releasediff_test.countedHandler{counted#2} fr1=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:childsingle") fr2=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:childsingle") fr1-fr2=same root-fr=distinct
+- map_key_scopes_in_child plain plain=root=*releasediff_test.countedHandler{counted#3} fr1=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:plain") fr2=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:plain") fr1-fr2=same root-fr=distinct
++ map_key_scopes_in_child plain plain=root=*releasediff_test.countedHandler{counted#4} fr1=*releasediff_test.countedHandler{counted#5} fr2=*releasediff_test.countedHandler{counted#6} fr1-fr2=distinct root-fr=distinct
++ map_key_scopes_in_child plain single=root=*releasediff_test.countedHandler{counted#1} fr1=*releasediff_test.countedHandler{counted#1} fr2=*releasediff_test.countedHandler{counted#1} fr1-fr2=same root-fr=same
+- map_key_scopes_in_child plain single=root=*releasediff_test.countedHandler{counted#1} fr1=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:single") fr2=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:single") fr1-fr2=same root-fr=distinct
+- map_key_scopes_in_child plain whole-map-vs-key=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:single")
++ map_key_scopes_in_child plain whole-map-vs-key=single:same
++ map_key_scopes_in_child trace childsingle=root=*releasediff_test.countedHandler{counted#2} fr1=*releasediff_test.countedHandler{counted#3} fr2=*releasediff_test.countedHandler{counted#3} fr1-fr2=same root-fr=distinct
+- map_key_scopes_in_child trace childsingle=root=*releasediff_test.countedHandler{counted#2} fr1=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:childsingle") fr2=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:childsingle") fr1-fr2=same root-fr=distinct
+- map_key_scopes_in_child trace plain=root=*releasediff_test.countedHandler{counted#3} fr1=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:plain") fr2=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:plain") fr1-fr2=same root-fr=distinct
++ map_key_scopes_in_child trace plain=root=*releasediff_test.countedHandler{counted#4} fr1=*releasediff_test.countedHandler{counted#5} fr2=*releasediff_test.countedHandler{counted#6} fr1-fr2=distinct root-fr=distinct
++ map_key_scopes_in_child trace single=root=*releasediff_test.countedHandler{counted#1} fr1=*releasediff_test.countedHandler{counted#1} fr2=*releasediff_test.countedHandler{counted#1} fr1-fr2=same root-fr=same
+- map_key_scopes_in_child trace single=root=*releasediff_test.countedHandler{counted#1} fr1=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:single") fr2=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:single") fr1-fr2=same root-fr=distinct
+- map_key_scopes_in_child trace whole-map-vs-key=ERR(can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:single")
++ map_key_scopes_in_child trace whole-map-vs-key=single:same
++ map_key_slice_map_provider_fields plain fr.M=releasediff_test.StringMap{"from":"root"}
+- map_key_slice_map_provider_fields plain fr.M=releasediff_test.StringMap{}
++ map_key_slice_map_provider_fields plain fr.P()=*releasediff_test.namedHandler{root-a}
+- map_key_slice_map_provider_fields plain fr.P()=PANIC("releasediff_test.HandlerProvider": can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_slice_map_provider_fields plain fr.S=[]string{"root-slice"}
+- map_key_slice_map_provider_fields plain fr.S=[]string{}
++ map_key_slice_map_provider_fields trace fr.M=releasediff_test.StringMap{"from":"root"}
+- map_key_slice_map_provider_fields trace fr.M=releasediff_test.StringMap{}
++ map_key_slice_map_provider_fields trace fr.P()=*releasediff_test.namedHandler{root-a}
+- map_key_slice_map_provider_fields trace fr.P()=PANIC("releasediff_test.HandlerProvider": can not automatically create an annotated injection "releasediff_test.Handler" with annotation "map:a")
++ map_key_slice_map_provider_fields trace fr.S=[]string{"root-slice"}
+- map_key_slice_map_provider_fields trace fr.S=[]string{}
++ module_self_dependency plain NewInjector=ERR(initialization of modules failed: failed adding modules to the graph: cyclic module dependency: *flamingo.me/dingo/releasediff_test.selfModule)
+- module_self_dependency plain NewInjector=PANIC(simple: adding self edge)
+- module_self_dependency plain TryModule=ERR(dingo.TryModule panic: "simple: adding self edge")
++ module_self_dependency plain TryModule=ERR(initialization of modules failed: failed adding modules to the graph: cyclic module dependency: *flamingo.me/dingo/releasediff_test.selfModule)
++ module_self_dependency plain child.InitModules=ERR(initialization of modules failed: failed adding modules to the graph: cyclic module dependency: *flamingo.me/dingo/releasediff_test.selfModule)
+- module_self_dependency plain child.InitModules=PANIC(simple: adding self edge)
++ module_self_dependency plain nested=ERR(initialization of modules failed: failed adding modules to the graph: could not add module: cyclic module dependency: *flamingo.me/dingo/releasediff_test.selfModule)
+- module_self_dependency plain nested=PANIC(simple: adding self edge)
++ module_self_dependency trace NewInjector=ERR(initialization of modules failed: failed adding modules to the graph: cyclic module dependency: *flamingo.me/dingo/releasediff_test.selfModule)
+- module_self_dependency trace NewInjector=PANIC(simple: adding self edge)
+- module_self_dependency trace TryModule=ERR(dingo.TryModule panic: "simple: adding self edge")
++ module_self_dependency trace TryModule=ERR(initialization of modules failed: failed adding modules to the graph: cyclic module dependency: *flamingo.me/dingo/releasediff_test.selfModule)
++ module_self_dependency trace child.InitModules=ERR(initialization of modules failed: failed adding modules to the graph: cyclic module dependency: *flamingo.me/dingo/releasediff_test.selfModule)
+- module_self_dependency trace child.InitModules=PANIC(simple: adding self edge)
++ module_self_dependency trace nested=ERR(initialization of modules failed: failed adding modules to the graph: could not add module: cyclic module dependency: *flamingo.me/dingo/releasediff_test.selfModule)
+- module_self_dependency trace nested=PANIC(simple: adding self edge)
+- trace_cycle_through_provider_binding trace exit=stack overflow
++ trace_cycle_through_provider_binding trace get=PANIC(detected circular dependency)
++ trace_cycle_through_provider_binding trace log.01=msg="flamingo.me/dingo/releasediff_test#PortUser: "
++ trace_cycle_through_provider_binding trace log.02=msg="flamingo.me/dingo/releasediff_test#PortUser: "
++ trace_cycle_through_provider_binding trace log.lines=2
++ trace_enable_after_child_created plain exit=stack overflow
+- trace_enable_after_child_created plain get=PANIC(detected circular dependency)
+- trace_enable_after_child_created plain log.01=msg="flamingo.me/dingo/releasediff_test#CycleA: "
+- trace_enable_after_child_created plain log.02=msg="flamingo.me/dingo/releasediff_test#CycleB: "
+- trace_enable_after_child_created plain log.03=msg="flamingo.me/dingo/releasediff_test#CycleA: "
+- trace_enable_after_child_created plain log.lines=3
++ trace_enable_after_injector_created plain exit=stack overflow
+- trace_enable_after_injector_created plain get=PANIC(detected circular dependency)
+- trace_enable_after_injector_created plain log.01=msg="flamingo.me/dingo/releasediff_test#CycleA: "
+- trace_enable_after_injector_created plain log.02=msg="flamingo.me/dingo/releasediff_test#CycleB: "
+- trace_enable_after_injector_created plain log.03=msg="flamingo.me/dingo/releasediff_test#CycleA: "
+- trace_enable_after_injector_created plain log.lines=3
++ trace_injection_logging_enabled_after_create plain INJECTING-lines=0
+- trace_injection_logging_enabled_after_create plain INJECTING-lines=2
++ trace_injection_logging_enabled_after_create plain SETTING-lines=0
+- trace_injection_logging_enabled_after_create plain SETTING-lines=1
+- trace_injection_logging_enabled_after_create plain log.01=msg="INJECTING: flamingo.me/dingo/releasediff_test#Mid \"\""
+- trace_injection_logging_enabled_after_create plain log.02=msg="INJECTING: flamingo.me/dingo/releasediff_test#Leaf \"\""
+- trace_injection_logging_enabled_after_create plain log.03=msg="SETTING FIELD: L of type \"*releasediff_test.Leaf\""
+- trace_injection_logging_enabled_after_create plain log.lines=3
++ trace_injection_logging_enabled_after_create trace SETTING-lines=0
+- trace_injection_logging_enabled_after_create trace SETTING-lines=1
+- trace_injection_logging_enabled_after_create trace log.01=msg="SETTING FIELD: L of type \"*releasediff_test.Leaf\""
+- trace_injection_logging_enabled_after_create trace log.lines=1
++ trace_provider_recursion_depth_20 trace depth=17
+- trace_provider_recursion_depth_20 trace depth=20
++ trace_provider_recursion_depth_20 trace get=PANIC(detected circular dependency)
+- trace_provider_recursion_depth_20 trace get=ok *releasediff_test.RecursiveNode
++ trace_provider_recursion_depth_20 trace log.01=msg="flamingo.me/dingo/releasediff_test#RecursiveNode:  repeated through providers more than 16 times; tracing reports this as a cycle even if the recursion would end"
++ trace_provider_recursion_depth_20 trace log.02=msg="flamingo.me/dingo/releasediff_test#RecursiveNode: "
++ trace_provider_recursion_depth_20 trace log.03=msg="flamingo.me/dingo/releasediff_test#RecursiveNode: "
++ trace_provider_recursion_depth_20 trace log.lines=3
+- trace_singleton_cycle trace exit=hang
++ trace_singleton_cycle trace get=PANIC(detected circular dependency)
++ trace_singleton_cycle trace log.01=msg="flamingo.me/dingo/releasediff_test#SingletonA: "
++ trace_singleton_cycle trace log.02=msg="flamingo.me/dingo/releasediff_test#SingletonA: "
++ trace_singleton_cycle trace log.03=msg="flamingo.me/dingo/releasediff_test#SingletonB: "
++ trace_singleton_cycle trace log.04=msg="flamingo.me/dingo/releasediff_test#SingletonA: "
++ trace_singleton_cycle trace log.lines=4

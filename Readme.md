@@ -519,3 +519,9 @@ Use `Injector.EnableCircularTracing()` to detect circular dependencies. Call it 
 A provider called while its origin is still being constructed inherits that active ancestry, including calls from another goroutine. A type that repeats in its own construction chain with no generated provider call in between is reported at once. So is a singleton or child singleton that repeats in the same scope while it is still being built, because it would wait for itself forever. A repeat through a provider call is allowed up to 16 times in one chain and reported on the 17th. This lets bounded recursion through providers work, and so do provider calls from other goroutines that overlap a running construction. A singleton reached again through a provider call is only logged, because another goroutine may rightly wait for it. Tracing cannot tell that wait from a call on the same goroutine, which hangs. A provider keeps the ancestry it was created with, so an endless cycle that keeps calling one long-lived provider (for example one held by a singleton) is not detected.
 
 Use `Injector.EnableInjectionTracing()` to log what an injector injects and which fields it sets. Neither tracing method changes the slog level. The deprecated package-level `EnableCircularTracing()` and `EnableInjectionTracing()` functions set defaults for injectors created after the call; they do not change existing injectors.
+
+## Contributing
+
+Run `go test -race ./...` before you open a pull request. CI also runs `releasediff/check.sh`, which compares
+dingo's behaviour with the last release and fails on any difference that `releasediff/expected.txt` does not
+list. If you change behaviour on purpose, see [releasediff/README.md](releasediff/README.md).
