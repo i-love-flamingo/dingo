@@ -178,8 +178,12 @@ func (injector *Injector) initModules(modules []Module) error {
 
 	// evaluate overrides when modules were loaded
 	for _, override := range injector.overrides {
-		// override.typ is already dereferenced by Bind
+		// Lookups resolve *T through the T binding, so Override(new(*T))
+		// replaces the T binding.
 		bindtype := override.typ
+		if bindtype.Kind() == reflect.Pointer {
+			bindtype = bindtype.Elem()
+		}
 		if bindings, ok := injector.bindings[bindtype]; ok && len(bindings) > 0 {
 			for i, binding := range bindings {
 				if binding.annotatedWith == override.annotatedWith {

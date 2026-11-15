@@ -360,6 +360,10 @@ injector.Override(new(Something), "").To(MyBetterType{})
 
 The second argument sets the annotation if you want to override a named binding.
 
+Pass `Override` the same type you passed to `Bind`. Dingo removes one pointer from that type, and it resolves a
+request for `*Something` through the binding for `Something`. So `Override(new(*Something), "")` replaces the
+binding made with `Bind(new(Something))`. A binding made with `Bind(new(*Something))` is never used by a lookup.
+
 ### MultiBindings
 
 MultiBindings provide a way of binding multiple implementations of a type to a type,
