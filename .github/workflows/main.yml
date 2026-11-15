@@ -82,3 +82,15 @@ jobs:
         run: |
           go generate ./...
           git diff --quiet || (echo 'generated go files are not up-to-date, check go generate, go.sum and go.mod:' ; git diff ; exit 1)
+  release-diff:
+    runs-on: ubuntu-latest
+    name: Release diff
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - name: Compare behaviour with the last release
+        run: releasediff/check.sh
