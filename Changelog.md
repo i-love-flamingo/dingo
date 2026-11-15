@@ -1,5 +1,32 @@
 # Changelog
 
+## Version v0.5.0 (2026-11-15)
+
+### Features
+
+- **dingo:** split injector internals, add per-injector tracing and ExpandModules (#104) (b8063828)
+
+### Fixes
+
+- **dingo:** keep pointer Override on the value binding (#108) (ac1ba6be)
+- **dingo:** map: parent fallback and pointer Override (#106) (ca46858b)
+
+### Tests
+
+- cover scopes, inspection, overrides, and multibindings (#97) (b1621e40)
+
+### Ops and CI/CD
+
+- align job names and setup with the other repos (#102) (6b20add1)
+- scan dependencies with govulncheck (#101) (c3d02bae)
+
+### Chores and tidying
+
+- consolidate renovate config (#103) (2e638157)
+- **deps:** update dependency golangci/golangci-lint to v2.15.0 (#105) (f27bd278)
+- require go 1.26.0 (#100) (037af0cf)
+- **deps:** update dependency golangci/golangci-lint to v2.14.0 (#98) (a7ec18a1)
+
 ## Version v0.4.1 (2026-09-02)
 
 ### Fixes
