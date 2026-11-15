@@ -130,10 +130,8 @@ func (injector *Injector) InitModules(modules ...Module) error {
 
 	// evaluate overrides when modules were loaded
 	for _, override := range injector.overrides {
+		// override.typ is already dereferenced by Bind
 		bindtype := override.typ
-		if bindtype.Kind() == reflect.Ptr {
-			bindtype = bindtype.Elem()
-		}
 		if bindings, ok := injector.bindings[bindtype]; ok && len(bindings) > 0 {
 			for i, binding := range bindings {
 				if binding.annotatedWith == override.annotatedWith {
@@ -247,7 +245,9 @@ func (injector *Injector) findBindingForAnnotatedType(t reflect.Type, annotation
 
 	// inject one key of a map-binding
 	if len(annotation) > 4 && annotation[:4] == "map:" {
-		return injector.mapbindings[t][annotation[4:]]
+		if binding := injector.mapbindings[t][annotation[4:]]; binding != nil {
+			return binding
+		}
 	}
 
 	// ask parent
