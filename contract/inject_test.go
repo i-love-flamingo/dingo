@@ -9,7 +9,8 @@ import (
 )
 
 // injectMethodTarget is injected through its Inject method, which takes a
-// plain parameter and a struct whose fields carry the annotations.
+// plain parameter and a struct whose fields carry the annotations. It returns
+// its receiver, the usual shape of such a method; the return value is ignored.
 type injectMethodTarget struct {
 	called int
 	plain  greeter
@@ -21,11 +22,13 @@ func (target *injectMethodTarget) Inject(plain greeter, config *struct {
 	Name string  `inject:"config:shop.name"`
 	Loud greeter `inject:"loud"`
 },
-) {
+) *injectMethodTarget {
 	target.called++
 	target.plain = plain
 	target.name = config.Name
 	target.loud = config.Loud
+
+	return target
 }
 
 // injectingModule is a module with an Inject method that records what its
