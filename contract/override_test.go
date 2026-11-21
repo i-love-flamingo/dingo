@@ -1,4 +1,4 @@
-package dingo_test
+package contract_test
 
 import (
 	"reflect"
@@ -250,7 +250,7 @@ func TestOverride_DoublePointerTypeReplacesThePointerBinding(t *testing.T) {
 	})
 }
 
-func TestBind_PointerTypeIsNotReadByLookups(t *testing.T) {
+func TestLatent_BindPointerTypeIsNotReadByLookups(t *testing.T) {
 	t.Parallel()
 
 	// Known quirk: Bind strips one pointer and lookups strip one more, so a

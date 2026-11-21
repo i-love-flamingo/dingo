@@ -1,12 +1,12 @@
-package dingo_test
+package contract_test
 
 import (
 	"testing"
 
 	"flamingo.me/dingo"
 
-	commercecart "flamingo.me/dingo/testdata/moduleidentity/commerce/cart"
-	om3cart "flamingo.me/dingo/testdata/moduleidentity/om3/cart"
+	commercecart "flamingo.me/dingo/contract/testdata/moduleidentity/commerce/cart"
+	shopcart "flamingo.me/dingo/contract/testdata/moduleidentity/shop/cart"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,27 +28,27 @@ func TestInitModules_DistinctPackagesSameTypeName(t *testing.T) {
 	require.NoError(t, err)
 
 	commerceConfigured := 0
-	om3Configured := 0
+	shopConfigured := 0
 	commerceModule := &commercecart.Module{
 		OnConfigure: func() {
 			commerceConfigured++
 		},
 	}
-	om3Module := &om3cart.Module{
+	shopCartModule := &shopcart.Module{
 		OnConfigure: func() {
-			om3Configured++
+			shopConfigured++
 		},
 	}
 
 	// Both packages expose a cart.Module; both must be configured, not collapsed.
-	require.NoError(t, injector.InitModules(commerceModule, commerceModule, om3Module, om3Module))
+	require.NoError(t, injector.InitModules(commerceModule, commerceModule, shopCartModule, shopCartModule))
 	assert.Equal(t, 1, commerceConfigured)
-	assert.Equal(t, 1, om3Configured)
+	assert.Equal(t, 1, shopConfigured)
 
 	_, err = injector.GetInstance((*commercecart.Service)(nil))
 	require.NoError(t, err)
 
-	_, err = injector.GetInstance((*om3cart.Service)(nil))
+	_, err = injector.GetInstance((*shopcart.Service)(nil))
 	require.NoError(t, err)
 }
 
@@ -59,17 +59,17 @@ func TestInitModules_DistinctPackagesSameTypeNameAsDependencies(t *testing.T) {
 	require.NoError(t, err)
 
 	commerceConfigured := 0
-	om3Configured := 0
+	shopConfigured := 0
 	root := &moduleWithDependencies{
 		dependencies: []dingo.Module{
 			&commercecart.Module{OnConfigure: func() { commerceConfigured++ }},
-			&om3cart.Module{OnConfigure: func() { om3Configured++ }},
+			&shopcart.Module{OnConfigure: func() { shopConfigured++ }},
 		},
 	}
 
 	require.NoError(t, injector.InitModules(root))
 	assert.Equal(t, 1, commerceConfigured)
-	assert.Equal(t, 1, om3Configured)
+	assert.Equal(t, 1, shopConfigured)
 }
 
 func TestInitModules_DistinctAnonymousModulesSameEmbeddedTypeName(t *testing.T) {
@@ -79,7 +79,7 @@ func TestInitModules_DistinctAnonymousModulesSameEmbeddedTypeName(t *testing.T) 
 	require.NoError(t, err)
 
 	commerceConfigured := 0
-	om3Configured := 0
+	shopConfigured := 0
 	commerceModule := &struct{ *commercecart.Module }{
 		Module: &commercecart.Module{
 			OnConfigure: func() {
@@ -87,10 +87,10 @@ func TestInitModules_DistinctAnonymousModulesSameEmbeddedTypeName(t *testing.T) 
 			},
 		},
 	}
-	om3Module := &struct{ *om3cart.Module }{
-		Module: &om3cart.Module{
+	shopCartModule := &struct{ *shopcart.Module }{
+		Module: &shopcart.Module{
 			OnConfigure: func() {
-				om3Configured++
+				shopConfigured++
 			},
 		},
 	}
@@ -98,13 +98,13 @@ func TestInitModules_DistinctAnonymousModulesSameEmbeddedTypeName(t *testing.T) 
 	// Both anonymous wrappers embed a same-named cart.Module from a different
 	// package. Both promoted Configure methods must run; if the two modules
 	// were collapsed into one, only one counter would be incremented.
-	require.NoError(t, injector.InitModules(commerceModule, om3Module))
+	require.NoError(t, injector.InitModules(commerceModule, shopCartModule))
 	assert.Equal(t, 1, commerceConfigured)
-	assert.Equal(t, 1, om3Configured)
+	assert.Equal(t, 1, shopConfigured)
 
 	_, err = injector.GetInstance((*commercecart.Service)(nil))
 	require.NoError(t, err)
 
-	_, err = injector.GetInstance((*om3cart.Service)(nil))
+	_, err = injector.GetInstance((*shopcart.Service)(nil))
 	require.NoError(t, err)
 }

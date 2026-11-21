@@ -1,4 +1,4 @@
-// Intentionally identical to om3/cart so Type.String() collides while reflect.Type does not.
+// Intentionally identical to shop/cart so Type.String() collides while reflect.Type does not.
 package cart
 
 import "flamingo.me/dingo"

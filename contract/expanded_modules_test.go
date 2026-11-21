@@ -1,4 +1,4 @@
-package dingo_test
+package contract_test
 
 import (
 	"reflect"

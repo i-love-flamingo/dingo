@@ -1,4 +1,4 @@
-package dingo_test
+package contract_test
 
 // Fixtures shared by the black-box tests in this package.
 //
