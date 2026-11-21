@@ -79,22 +79,6 @@ func TestDuplicateBinding_UnequalBindingsErrorAtInitModules(t *testing.T) {
 	})
 }
 
-func TestOverride_UnboundKeyActsAsBind(t *testing.T) {
-	t.Parallel()
-
-	// Override binds the key itself before the override loop runs, so
-	// overriding a key that nothing else bound works like Bind.
-	injector := newInjector(t)
-
-	require.NoError(t, injector.InitModules(dingo.ModuleFunc(func(injector *dingo.Injector) {
-		injector.Override(new(string), "greeting").ToInstance("override")
-	})))
-
-	resolved, err := injector.GetAnnotatedInstance(new(string), "greeting")
-	require.NoError(t, err)
-	assert.Equal(t, "override", resolved)
-}
-
 func TestOverride_AfterInitModulesAppliesOnTheNextInitModules(t *testing.T) {
 	t.Parallel()
 
@@ -269,4 +253,119 @@ func TestLatent_BindPointerTypeIsNotReadByLookups(t *testing.T) {
 	}
 	require.NoError(t, injector.RequestInjection(&holder))
 	assert.Empty(t, holder.Plain.name)
+}
+
+// Overrides are applied after all modules were configured, so an override wins
+// over a binding that a later module makes.
+func TestOverride_AppliesAfterAllModules(t *testing.T) {
+	t.Parallel()
+
+	injector := newInjector(t, dingo.ModuleFunc(func(injector *dingo.Injector) {
+		injector.Override(new(greeter), "").To(loudGreeter{})
+	}), dingo.ModuleFunc(func(injector *dingo.Injector) {
+		injector.Bind(new(greeter)).To(helloGreeter{})
+	}))
+
+	resolved, err := injector.GetInstance(new(greeter))
+	require.NoError(t, err)
+	assert.Equal(t, "HELLO", resolved.(greeter).Greet())
+}
+
+// An override replaces the whole binding: the scope and the eager flag of the
+// original do not carry over.
+func TestOverride_ReplacesTheWholeBinding(t *testing.T) {
+	t.Parallel()
+
+	t.Run("scope", func(t *testing.T) {
+		t.Parallel()
+
+		injector := newInjector(t, dingo.ModuleFunc(func(injector *dingo.Injector) {
+			injector.Bind(new(counter)).In(dingo.Singleton)
+		}), dingo.ModuleFunc(func(injector *dingo.Injector) {
+			injector.Override(new(counter), "").ToProvider(func() *counter {
+				return &counter{N: 1}
+			})
+		}))
+
+		first, err := injector.GetInstance(new(counter))
+		require.NoError(t, err)
+
+		second, err := injector.GetInstance(new(counter))
+		require.NoError(t, err)
+
+		assert.Equal(t, 1, first.(*counter).N)
+		assert.NotSame(t, first, second)
+	})
+
+	t.Run("eager singleton", func(t *testing.T) {
+		t.Parallel()
+
+		built := 0
+
+		newInjector(t, dingo.ModuleFunc(func(injector *dingo.Injector) {
+			injector.Bind(new(counter)).ToProvider(func() *counter {
+				return &counter{}
+			})
+		}), dingo.ModuleFunc(func(injector *dingo.Injector) {
+			injector.Override(new(counter), "").ToProvider(func() *counter {
+				built++
+
+				return &counter{}
+			}).AsEagerSingleton()
+		}))
+
+		assert.Equal(t, 1, built)
+	})
+}
+
+// An override whose key does not match a binding is applied to nothing, and no
+// error says so. For an unknown annotation of a bound type, the original stays
+// in place and the override binds under its own key. For the non-pointer form of
+// an unbound type, Override works like Bind.
+func TestLatent_OverrideOfAnUnknownKeyBindsSilently(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unknown annotation of a bound type", func(t *testing.T) {
+		t.Parallel()
+
+		injector := newInjector(t, dingo.ModuleFunc(func(injector *dingo.Injector) {
+			injector.Bind(new(greeter)).To(helloGreeter{})
+			injector.Override(new(greeter), "misspelled").To(loudGreeter{})
+		}))
+
+		plain, err := injector.GetInstance(new(greeter))
+		require.NoError(t, err)
+		assert.Equal(t, "hello", plain.(greeter).Greet())
+
+		misspelled, err := injector.GetAnnotatedInstance(new(greeter), "misspelled")
+		require.NoError(t, err)
+		assert.Equal(t, "HELLO", misspelled.(greeter).Greet())
+	})
+
+	t.Run("non-pointer form of an unbound type", func(t *testing.T) {
+		t.Parallel()
+
+		injector := newInjector(t, dingo.ModuleFunc(func(injector *dingo.Injector) {
+			injector.Override(new(counter), "basket").ToInstance(&counter{N: 2})
+		}))
+
+		resolved, err := injector.GetAnnotatedInstance(new(counter), "basket")
+		require.NoError(t, err)
+		assert.Equal(t, 2, resolved.(*counter).N)
+	})
+}
+
+// Override of the pointer form of a type that nothing bound is an error,
+// unlike the non-pointer form of it.
+func TestOverride_PointerTypeOfAnUnboundTypeErrors(t *testing.T) {
+	t.Parallel()
+
+	injector := newInjector(t)
+
+	err := injector.InitModules(dingo.ModuleFunc(func(injector *dingo.Injector) {
+		injector.Override(new(*counter), "basket").ToInstance(&counter{N: 2})
+	}))
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "cannot override unknown binding")
 }

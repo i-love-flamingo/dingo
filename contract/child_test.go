@@ -74,3 +74,50 @@ func TestChild_InjectorSelfBindingReturnsCurrentInjector(t *testing.T) {
 	require.NoError(t, err)
 	assert.Same(t, parent.Injector, resolvedInParent.(*injectorField).Injector)
 }
+
+// A child resolves a multibinding with the entries of its parent first and its
+// own after them.
+func TestChild_ParentEntriesComeFirstInMergedCollections(t *testing.T) {
+	t.Parallel()
+
+	parent := newInjector(t, dingo.ModuleFunc(func(injector *dingo.Injector) {
+		injector.BindMulti(new(greeter)).To(helloGreeter{})
+	}))
+
+	child := parent.child(t)
+	require.NoError(t, child.InitModules(dingo.ModuleFunc(func(injector *dingo.Injector) {
+		injector.BindMulti(new(greeter)).To(loudGreeter{})
+	})))
+
+	resolved, err := child.GetInstance(new([]greeter))
+	require.NoError(t, err)
+
+	greetings := make([]string, 0, 2)
+
+	for _, item := range resolved.([]greeter) {
+		greetings = append(greetings, item.Greet())
+	}
+
+	assert.Equal(t, []string{"hello", "HELLO"}, greetings)
+}
+
+// A module that runs in a child can still bind into the parent through the
+// injector it captured. Both then resolve the binding.
+func TestChild_ModuleCanBindIntoTheInitializedParent(t *testing.T) {
+	t.Parallel()
+
+	parent := newInjector(t)
+	child := parent.child(t)
+
+	require.NoError(t, child.InitModules(dingo.ModuleFunc(func(*dingo.Injector) {
+		parent.Bind(new(greeter)).To(helloGreeter{})
+	})))
+
+	fromParent, err := parent.GetInstance(new(greeter))
+	require.NoError(t, err)
+	assert.Equal(t, "hello", fromParent.(greeter).Greet())
+
+	fromChild, err := child.GetInstance(new(greeter))
+	require.NoError(t, err)
+	assert.Equal(t, "hello", fromChild.(greeter).Greet())
+}
