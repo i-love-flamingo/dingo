@@ -99,6 +99,8 @@ func requireAllocsAtMost(t *testing.T, ceiling float64, f func()) {
 	}
 }
 
+// GetInstance of an unscoped type with one injected field must stay near 9
+// allocations. Guards against extra reflection or copying on the resolve path.
 func TestPerf_AllocsGetInstanceUnscoped(t *testing.T) { //nolint:paralleltest // AllocsPerRun counts allocations of the whole process
 	injector := perfInjector(t)
 
@@ -108,6 +110,9 @@ func TestPerf_AllocsGetInstanceUnscoped(t *testing.T) { //nolint:paralleltest //
 	})
 }
 
+// GetInstance of a singleton that is already built must stay near 2
+// allocations. Guards against the scope cache rebuilding or copying the
+// instance on every call.
 func TestPerf_AllocsGetInstanceSingleton(t *testing.T) { //nolint:paralleltest // AllocsPerRun counts allocations of the whole process
 	injector := perfInjector(t)
 
@@ -117,6 +122,8 @@ func TestPerf_AllocsGetInstanceSingleton(t *testing.T) { //nolint:paralleltest /
 	})
 }
 
+// GetInstance of a built child singleton must stay near 2 allocations.
+// Guards against the per-child cache doing more work than the plain singleton.
 func TestPerf_AllocsGetInstanceChildSingleton(t *testing.T) { //nolint:paralleltest // AllocsPerRun counts allocations of the whole process
 	injector := perfInjector(t).child(t)
 
@@ -126,6 +133,8 @@ func TestPerf_AllocsGetInstanceChildSingleton(t *testing.T) { //nolint:parallelt
 	})
 }
 
+// GetAnnotatedInstance must stay near 4 allocations. Guards against the
+// annotation lookup copying binding maps or building keys the slow way.
 func TestPerf_AllocsGetAnnotatedInstance(t *testing.T) { //nolint:paralleltest // AllocsPerRun counts allocations of the whole process
 	injector := perfInjector(t)
 
@@ -135,6 +144,8 @@ func TestPerf_AllocsGetAnnotatedInstance(t *testing.T) { //nolint:paralleltest /
 	})
 }
 
+// Calling a generated provider must stay near 10 allocations. Guards against
+// the provider path resolving and injecting more than the one instance it returns.
 func TestPerf_AllocsProviderCall(t *testing.T) { //nolint:paralleltest // AllocsPerRun counts allocations of the whole process
 	injector := perfInjector(t)
 
@@ -149,6 +160,8 @@ func TestPerf_AllocsProviderCall(t *testing.T) { //nolint:paralleltest // Allocs
 	})
 }
 
+// Injecting 20 config fields must stay near 43 allocations. Guards against
+// a per-field cost that grows, such as repeated binding lookups or tag parsing.
 func TestPerf_AllocsInjectTwentyConfigFields(t *testing.T) { //nolint:paralleltest // AllocsPerRun counts allocations of the whole process
 	injector := perfInjector(t)
 
