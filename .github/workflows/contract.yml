@@ -1,0 +1,89 @@
+name: Contract
+
+on:
+  pull_request:
+    branches:
+      - master
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    name: Contract label
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Changed contract files need the contract-change label
+        env:
+          LABELED: ${{ contains(github.event.pull_request.labels.*.name, 'contract-change') }}
+        run: |
+          changed=$(git diff --name-only --diff-filter=MDR HEAD^1 HEAD -- contract .github/workflows)
+          if [ -z "$changed" ]; then
+            echo "No existing contract test or workflow file changed."
+            exit 0
+          fi
+          echo "These existing contract test or workflow files changed:"
+          echo "$changed"
+          if [ "$LABELED" = true ]; then
+            echo "The contract-change label is set."
+            exit 0
+          fi
+          echo "::error::This pull request changes, deletes or renames existing files in contract/ or .github/workflows/. A maintainer adds the contract-change label after the review of that change."
+          exit 1
+  downstream:
+    runs-on: ubuntu-latest
+    name: Downstream (public)
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: dingo
+          fetch-depth: 2
+      - name: Check out the base commit
+        run: git -C dingo worktree add ../dingo-base HEAD^1
+      - uses: actions/checkout@v7
+        with:
+          repository: i-love-flamingo/flamingo
+          path: flamingo
+      - uses: actions/checkout@v7
+        with:
+          repository: i-love-flamingo/flamingo-commerce
+          path: flamingo-commerce
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.*'
+          check-latest: true
+          cache-dependency-path: '*/go.sum'
+      - name: Build and test the downstream modules
+        env:
+          HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'contract-change') }}
+        run: |
+          # downstream <consumer dir> [go test flags]
+          downstream() {
+            echo "::group::$*"
+            rc=0
+            sh dingo/contract/downstream.sh dingo dingo-base "$@" || rc=$?
+            echo "::endgroup::"
+            if [ "$rc" -eq 0 ]; then
+              return 0
+            fi
+            if [ "$HAS_LABEL" = "true" ]; then
+              if [ "$rc" -eq 1 ]; then
+                echo "::warning::The downstream module breaks: $*. The contract-change label accepts this."
+                return 0
+              fi
+              echo "::error::contract/downstream.sh failed with exit code $rc: $*. The label does not accept this."
+              return "$rc"
+            fi
+            return "$rc"
+          }
+
+          status=0
+          downstream flamingo || status=$?
+          downstream flamingo-commerce || status=$?
+          downstream flamingo-commerce -tags=integration -count=1 || status=$?
+          exit "$status"
