@@ -1,4 +1,4 @@
-package dingo_test
+package contract_test
 
 import (
 	"testing"
@@ -114,4 +114,33 @@ func TestEagerSingleton_ConstructionFailureIsReportedByInitModules(t *testing.T)
 	// because it proves bind-time acceptance and never builds eager
 	// singletons.
 	assert.NoError(t, dingo.TryModule(failingEagerModule{}))
+}
+
+// With the automatic build disabled, an eager singleton is built on its first
+// resolution, once, like any other singleton.
+func TestLatent_DisabledEagerBuildBuildsLazilyOnce(t *testing.T) {
+	t.Parallel()
+
+	built := 0
+
+	injector := newInjector(t)
+	injector.SetBuildEagerSingletons(false)
+	require.NoError(t, injector.InitModules(dingo.ModuleFunc(func(injector *dingo.Injector) {
+		injector.Bind(new(counter)).ToProvider(func() *counter {
+			built++
+
+			return &counter{N: built}
+		}).AsEagerSingleton()
+	})))
+
+	assert.Zero(t, built)
+
+	first, err := injector.GetInstance(new(counter))
+	require.NoError(t, err)
+
+	second, err := injector.GetInstance(new(counter))
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, built)
+	assert.Same(t, first, second)
 }

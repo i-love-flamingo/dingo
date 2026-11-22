@@ -1,8 +1,11 @@
-package dingo_test
+package contract_test
 
 import (
 	"reflect"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"flamingo.me/dingo"
 	"github.com/stretchr/testify/assert"
@@ -135,4 +138,118 @@ func TestBindScope_FreshScopeReplacesTheCache(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NotSame(t, before, after)
+}
+
+// processSingleton is resolved from the process-wide singleton scope.
+type processSingleton struct {
+	N int
+}
+
+// reassignedSingleton is resolved after the process-wide scopes were replaced.
+type reassignedSingleton struct {
+	N int
+}
+
+// Injectors that use the process-wide dingo.Singleton share its cache, so two
+// injectors in one process get the same instance.
+func TestLatent_SingletonIsSharedByTheWholeProcess(t *testing.T) {
+	t.Parallel()
+
+	resolve := func() any {
+		injector, err := dingo.NewInjector()
+		require.NoError(t, err)
+
+		injector.Bind(new(processSingleton)).In(dingo.Singleton)
+
+		instance, err := injector.GetInstance(new(processSingleton))
+		require.NoError(t, err)
+
+		return instance
+	}
+
+	assert.Same(t, resolve(), resolve())
+}
+
+// A program can replace dingo.Singleton and dingo.ChildSingleton with new
+// scopes. Injectors made afterwards then use new caches.
+func TestScope_ReassignedGlobalScopesIsolateTheCaches(t *testing.T) { //nolint:paralleltest // replaces the process-wide scopes
+	singleton, childSingleton := dingo.Singleton, dingo.ChildSingleton
+
+	t.Cleanup(func() {
+		dingo.Singleton, dingo.ChildSingleton = singleton, childSingleton
+	})
+
+	resolve := func(scope dingo.Scope) any {
+		injector, err := dingo.NewInjector()
+		require.NoError(t, err)
+
+		injector.Bind(new(reassignedSingleton)).In(scope)
+
+		instance, err := injector.GetInstance(new(reassignedSingleton))
+		require.NoError(t, err)
+
+		return instance
+	}
+
+	before := resolve(dingo.Singleton)
+	dingo.Singleton = dingo.NewSingletonScope()
+	assert.NotSame(t, before, resolve(dingo.Singleton))
+
+	before = resolve(dingo.ChildSingleton)
+	dingo.ChildSingleton = dingo.NewChildSingletonScope()
+	assert.NotSame(t, before, resolve(dingo.ChildSingleton))
+}
+
+// Many goroutines that resolve a scoped binding for the first time at once
+// get one instance, and the instance is built once.
+func TestScope_ConcurrentFirstResolutionBuildsOneInstance(t *testing.T) {
+	t.Parallel()
+
+	const goroutines = 16
+
+	for name, scope := range map[string]dingo.Scope{
+		"singleton":       dingo.Singleton,
+		"child singleton": dingo.ChildSingleton,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var built atomic.Int32
+
+			injector := newInjector(t, dingo.ModuleFunc(func(injector *dingo.Injector) {
+				injector.Bind(new(counter)).ToProvider(func() *counter {
+					built.Add(1)
+					time.Sleep(10 * time.Millisecond)
+
+					return &counter{}
+				}).In(scope)
+			}))
+
+			var start, done sync.WaitGroup
+
+			start.Add(1)
+
+			results := make([]any, goroutines)
+
+			for index := range goroutines {
+				done.Go(func() {
+					start.Wait()
+
+					instance, err := injector.GetInstance(new(counter))
+					assert.NoError(t, err)
+
+					results[index] = instance
+				})
+			}
+
+			start.Done()
+			done.Wait()
+
+			assert.Equal(t, int32(1), built.Load())
+
+			for _, result := range results {
+				assert.Same(t, results[0], result)
+			}
+		})
+	}
 }

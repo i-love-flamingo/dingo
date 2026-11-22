@@ -1,4 +1,4 @@
-package dingo_test
+package contract_test
 
 import (
 	"testing"
@@ -83,4 +83,37 @@ func TestRequestInjection_QueuedFailureReturnsFromInitModules(t *testing.T) {
 
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "can not instantiate interface")
+}
+
+// greeterRequestingModule binds a greeter and asks for injection while it is
+// configured.
+type greeterRequestingModule struct {
+	target *injectedGreeter
+}
+
+// injectedGreeter holds the greeter that a request for injection gave it.
+type injectedGreeter struct {
+	Greeter greeter `inject:""`
+}
+
+func (module *greeterRequestingModule) Configure(injector *dingo.Injector) {
+	injector.Bind(new(greeter)).To(helloGreeter{})
+
+	module.target = new(injectedGreeter)
+
+	_ = injector.RequestInjection(module.target)
+}
+
+// Injection that is requested while modules are configured waits until all
+// modules and overrides are applied, so it sees the overridden binding.
+func TestRequestInjection_DuringConfigureSeesOverrides(t *testing.T) {
+	t.Parallel()
+
+	module := new(greeterRequestingModule)
+
+	newInjector(t, module, dingo.ModuleFunc(func(injector *dingo.Injector) {
+		injector.Override(new(greeter), "").To(loudGreeter{})
+	}))
+
+	assert.Equal(t, "HELLO", module.target.Greeter.Greet())
 }

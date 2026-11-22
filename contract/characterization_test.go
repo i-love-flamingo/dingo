@@ -1,4 +1,4 @@
-package dingo_test
+package contract_test
 
 import (
 	"testing"
@@ -485,10 +485,11 @@ func TestCharacterizationInitModules(t *testing.T) {
 	t.Run("override of an unknown annotation creates the binding", func(t *testing.T) {
 		t.Parallel()
 
-		// Override binds before it records the override, so the
-		// "cannot override unknown binding" error is unreachable through
-		// the public interface: an override without an original binding
-		// silently creates the annotated binding.
+		// Override binds before it records the override, so an override
+		// without an original binding silently creates the annotated
+		// binding. Only the pointer shape Override(new(*T), a) returns
+		// "cannot override unknown binding"; see
+		// TestOverride_PointerTypeWithOnlyThePointerBoundErrors.
 		module := dingo.ModuleFunc(func(injector *dingo.Injector) {
 			injector.Override(new(charLogger), "missing").To(charLogOther{})
 		})
